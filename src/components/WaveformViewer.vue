@@ -15,6 +15,8 @@
 </template>
 
 <script setup>
+import { createApp } from 'vue';
+import App from './App.vue';
 import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue';
 import * as echarts from 'echarts';
 
