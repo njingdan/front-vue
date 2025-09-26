@@ -9,13 +9,13 @@
       <div class="stats">
         <span>接收数据点：{{ totalPoints }} 个</span>
         <span>当前帧率：{{ fps.toFixed(1) }} FPS</span>
+        <span>数据速率：{{ dataRate.toFixed(1) }} K点/秒</span>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-
 import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue';
 import * as echarts from 'echarts';
 
@@ -25,17 +25,26 @@ const chart = ref(null);
 const isPlaying = ref(true);
 const totalPoints = ref(0);
 const fps = ref(0);
+const dataRate = ref(0);
 const dataBuffer = ref([]);
 let ws = null;
 let frameCount = 0;
 let lastFpsTime = Date.now();
+let lastDataCount = 0;
 
-// 滚动波形配置
-const MAX_BUFFER_SIZE = 1500; // 缓冲区最大数据点（控制总显示长度）
-const DISPLAY_POINTS = 1000;   // 图表单次显示的点数量（建议小于MAX_BUFFER_SIZE）
+// 时间轴关键变量
+let startTime = null;
+let currentTimeOffset = 0;
 
+// 高频数据配置（1000:1降采样）
+const MAX_BUFFER_SIZE = 10*10*1000/10;         // 缓冲区：10秒数据（10点/批 × 100批/秒 × 10秒 = 5000点）
+const DISPLAY_TIME_WINDOW = 10;       // 显示10秒窗口
+const BATCH_INTERVAL_MS = 10;         // 后端每10ms发送一批
+const EXPECTED_POINTS_PER_BATCH = 10; // 期望每批10个点（1000:1降采样后）
 
-const sampleRate = 1000; // 采样率（每秒采样点数）
+// 计算时间参数
+const POINTS_PER_SECOND = 1000 / BATCH_INTERVAL_MS * EXPECTED_POINTS_PER_BATCH; // 1000点/秒
+const POINT_INTERVAL = 1 / POINTS_PER_SECOND; // 每个点的时间间隔：0.001秒
 
 // 初始化ECharts图表
 const initChart = () => {
@@ -44,12 +53,15 @@ const initChart = () => {
   chart.value = echarts.init(chartRef.value);
 
   const option = {
-    animation: false, // 实时数据建议关闭动画
+    animation: false,
     tooltip: {
       trigger: 'axis',
       axisPointer: {
-        type: 'line',
-        snap: true
+        type: 'line'
+      },
+      formatter: (params) => {
+        const point = params[0];
+        return `时间: ${point.value[0].toFixed(3)}秒<br/>幅值: ${point.value[1].toFixed(4)}`;
       }
     },
     grid: {
@@ -60,77 +72,47 @@ const initChart = () => {
       containLabel: true
     },
     xAxis: {
-      type: 'value', // 数值轴
+      type: 'value',
       name: '时间（秒）',
       nameLocation: 'end',
       nameTextStyle: {
         fontSize: 12,
         padding: [5, 0, 0, 0]
       },
-      axisLine: {
-        show: true,
-        lineStyle: { color: '#ccc' }
-      },
+      axisLine: { show: true, lineStyle: { color: '#ccc' } },
       axisTick: { show: false },
-      splitLine: {
-        show: true,
-        lineStyle: {
-          type: 'dashed',
-          color: '#f0f0f0'
-        }
-      },
+      splitLine: { show: false },
       min: 0,
-      max: 2,
+      max: DISPLAY_TIME_WINDOW,
       axisLabel: {
-        formatter: function (value) {
-          return value.toFixed(1);
+        formatter: function(value) {
+          return value % 1 === 0 ? value.toFixed(0) : '';
         }
       }
     },
     yAxis: {
-      type: 'value', // 数值轴
+      type: 'value',
       name: '信号幅值',
       nameLocation: 'end',
-      nameTextStyle: {
-        fontSize: 12,
-        padding: [0, 0, 5, 0]
-      },
-      min: -1.2,
-      max: 1.2,
-      axisLine: {
-        show: true,
-        lineStyle: { color: '#ccc' }
-      },
-      axisTick: { show: true },
-      splitLine: {
-        show: true,
-        lineStyle: {
-          type: 'dashed',
-          color: '#f0f0f0'
-        }
-      }
+      min: 0,
+      max: 0.6,
+      axisLine: { show: true, lineStyle: { color: '#ccc' } },
+      splitLine: { show: false }
     },
-    series: [
-      {
-        name: '波形数据',
-        type: 'line',
-        // 移除 coordinateSystem 配置，使用默认的笛卡尔坐标系
-        // coordinateSystem: 'cartesian2d', // 这行注释掉或删除
-        data: [],
-        showSymbol: false, // 替代 symbol: 'none'
-        smooth: true,
-        lineStyle: {
-          width: 1.2,
-          color: '#1890ff'
-        },
-        areaStyle: {
-          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-            { offset: 0, color: 'rgba(24, 144, 255, 0.3)' },
-            { offset: 1, color: 'rgba(24, 144, 255, 0.1)' }
-          ])
-        }
+    series: [{
+      name: '波形数据',
+      type: 'line',
+      data: [],
+      showSymbol: false,
+      smooth: false,
+      lineStyle: { width: 1, color: '#1890ff' },
+      areaStyle: {
+        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+          { offset: 0, color: 'rgba(24, 144, 255, 0.3)' },
+          { offset: 1, color: 'rgba(24, 144, 255, 0.1)' }
+        ])
       }
-    ],
+    }]
   };
 
   chart.value.setOption(option);
@@ -139,29 +121,48 @@ const initChart = () => {
 // 初始化WebSocket连接
 const initWebSocket = () => {
   const wsUrl = `ws://${window.location.hostname}:8080/gnuradio/ws`;
+  console.log('连接WebSocket:', wsUrl);
+  console.log('高频数据配置（1000:1降采样）:', {
+    batchInterval: BATCH_INTERVAL_MS + 'ms',
+    expectedPointsPerBatch: EXPECTED_POINTS_PER_BATCH,
+    pointsPerSecond: POINTS_PER_SECOND,
+    displayWindow: DISPLAY_TIME_WINDOW + '秒',
+    totalBufferPoints: MAX_BUFFER_SIZE
+  });
 
   try {
     ws = new WebSocket(wsUrl);
 
     ws.onopen = () => {
-      console.log('WebSocket连接成功，开始接收波形数据');
+      console.log('WebSocket连接成功，开始接收高频波形数据（1000:1降采样）');
+      startTime = Date.now();
+      currentTimeOffset = 0;
+      lastDataCount = 0;
     };
 
     ws.onmessage = (event) => {
-      if (!isPlaying.value) return;
+      if (!isPlaying.value || !startTime) return;
+      
       try {
-        const newData = JSON.parse(event.data);
-        if (!Array.isArray(newData) || newData.length === 0) return;
+        const response = JSON.parse(event.data);
+        if (!response.magnitudes || !Array.isArray(response.magnitudes)) {
+          console.warn('无效的数据格式:', response);
+          return;
+        }
+        
+        const newData = response.magnitudes;
+        const actualPoints = newData.length;
+        
+        // 验证数据点数（期望每批10个点）
+        if (actualPoints !== EXPECTED_POINTS_PER_BATCH) {
+          console.warn(`数据点数异常: 期望${EXPECTED_POINTS_PER_BATCH}, 实际${actualPoints}`);
+        }
 
-        // 1. 更新统计数据
-        totalPoints.value += newData.length;
+        totalPoints.value += actualPoints;
         frameCount++;
 
-        // 2. 直接添加新数据（不再裁剪，让缓冲区无限增长）
-        dataBuffer.value.push(...newData);
-
-        // 3. 触发滚动波形更新
-        updateScrollingWaveform();
+        processNewData(newData);
+        
       } catch (error) {
         console.error('解析波形数据失败：', error);
       }
@@ -180,139 +181,147 @@ const initWebSocket = () => {
   }
 };
 
-// 更新波形图 - 修复版本
-const updateWaveform = () => {
-  if (!chart.value || dataBuffer.value.length === 0) return;
+// 处理新数据（1000:1降采样优化）
+const processNewData = (newData) => {
+  if (!startTime || newData.length === 0) return;
 
-  // 创建x轴数据（索引）
-  const xData = Array.from({ length: dataBuffer.value.length }, (_, i) => i);
-
-  const option = {
-    series: [{
-      data: dataBuffer.value.map((value, index) => [index, value])
-      // 或者使用分开的x轴和y轴数据（推荐）：
-      // data: dataBuffer.value
-    }],
-    xAxis: {
-      data: xData // 设置x轴数据
-    }
-  };
-
-  chart.value.setOption(option, {
-    notMerge: false, // 使用合并模式，只更新变化的数据
-    lazyUpdate: true // 懒更新，提高性能
+  // 计算实际时间间隔（每批10个点，每点0.001秒）
+  const batchDuration = newData.length * POINT_INTERVAL; // 0.01秒（10ms）
+  
+  const newDataPoints = newData.map((value, index) => {
+    const pointTime = currentTimeOffset + index * POINT_INTERVAL;
+    return [pointTime, value];
   });
 
-  // 计算FPS
-  const now = Date.now();
-  if (now - lastFpsTime >= 1000) {
-    fps.value = frameCount / ((now - lastFpsTime) / 1000);
-    frameCount = 0;
-    lastFpsTime = now;
+  currentTimeOffset += batchDuration;
+
+  // 添加到缓冲区
+  dataBuffer.value.push(...newDataPoints);
+
+  // 缓冲区管理（保留最近10秒数据）
+  if (dataBuffer.value.length > MAX_BUFFER_SIZE) {
+    const removeCount = dataBuffer.value.length - MAX_BUFFER_SIZE;
+    dataBuffer.value = dataBuffer.value.slice(removeCount);
+  }
+
+  // 计算数据速率（点/秒）
+  const currentTime = Date.now();
+  if (currentTime - lastFpsTime >= 1000) {
+    const newPoints = totalPoints.value - lastDataCount;
+    dataRate.value = newPoints / 1000; // 转换为K点/秒
+    lastDataCount = totalPoints.value;
+    
+    console.log(`数据速率: ${dataRate.value.toFixed(1)}K点/秒, 缓冲区: ${dataBuffer.value.length}点`);
+  }
+
+  scheduleWaveformUpdate();
+};
+
+// 渲染调度（性能优化）
+let updateScheduled = false;
+let lastRenderTime = 0;
+const MIN_RENDER_INTERVAL = 100; // 最小渲染间隔100ms（最大10FPS）
+
+const scheduleWaveformUpdate = () => {
+  if (updateScheduled) return;
+  
+  updateScheduled = true;
+  
+  requestAnimationFrame(() => {
+    updateScheduled = false;
+    const now = Date.now();
+    
+    if (now - lastRenderTime >= MIN_RENDER_INTERVAL) {
+      updateWaveformDisplay();
+      lastRenderTime = now;
+    }
+  });
+};
+
+// 更新波形显示
+const updateWaveformDisplay = () => {
+  if (!chart.value || dataBuffer.value.length === 0) return;
+  
+  try {
+    const latestTime = currentTimeOffset;
+    const displayStart = Math.max(0, latestTime - DISPLAY_TIME_WINDOW);
+    const displayEnd = Math.max(DISPLAY_TIME_WINDOW, latestTime);
+
+    // 筛选显示范围内的数据点
+    const displayData = dataBuffer.value.filter(point => 
+      point[0] >= displayStart && point[0] <= displayEnd
+    );
+
+    // 更新图表
+    chart.value.setOption({
+      xAxis: { 
+        min: displayStart,
+        max: displayEnd
+      },
+      series: [{ 
+        data: displayData 
+      }]
+    }, { notMerge: false, lazyUpdate: true });
+
+    // 更新FPS
+    const currentTime = Date.now();
+    if (currentTime - lastFpsTime >= 1000) {
+      fps.value = frameCount;
+      frameCount = 0;
+      lastFpsTime = currentTime;
+    }
+    
+  } catch (error) {
+    console.error('更新波形显示失败:', error);
   }
 };
-
-
-// 在状态管理部分添加更新锁
-let isUpdating = false; // 防止并发更新图表（性能优化）
-
-const updateScrollingWaveform = () => {
-  if (!chart.value || dataBuffer.value.length === 0 || isUpdating) return;
-  isUpdating = true;
-
-  requestAnimationFrame(() => {
-    try {
-      // 1. 计算最新数据的时间（最后一个数据点的时间）
-      const latestTime = dataBuffer.value.length / sampleRate;
-      // 2. 计算显示窗口的起始时间（最新时间 - 2秒，可调整窗口长度）
-      const startTime = Math.max(0, latestTime - 2);
-
-      // 3. 生成显示数据（只取窗口内的点）
-      const displayData = dataBuffer.value.filter((_, index) => {
-        const time = index / sampleRate;
-        return time >= startTime && time <= latestTime;
-      });
-
-      // 4. 生成图表数据（[时间, 幅值] 格式）
-      const seriesData = displayData.map((yValue, index) => [
-        (dataBuffer.value.length - displayData.length + index) / sampleRate,
-        yValue
-      ]);
-
-      // 5. 增量更新图表（X轴范围动态扩展）
-      const updateOption = {
-        xAxis: {
-          min: startTime,
-          max: latestTime // X轴最大值为最新数据的时间
-        },
-        series: [{
-          data: seriesData
-        }]
-      };
-
-      chart.value.setOption(updateOption, { notMerge: false, lazyUpdate: true });
-
-      // 6. 计算FPS
-      const currentTime = Date.now();
-      if (currentTime - lastFpsTime >= 1000) {
-        fps.value = frameCount / ((currentTime - lastFpsTime) / 1000);
-        frameCount = 0;
-        lastFpsTime = currentTime;
-      }
-    } finally {
-      isUpdating = false;
-    }
-  });
-};
-
-
 
 // 控制方法
 const togglePlay = () => {
   isPlaying.value = !isPlaying.value;
-};
-
-
-
-// 响应窗口大小变化
-const handleResize = () => {
-  nextTick(() => {
-    chart.value?.resize();
-  });
-};
-
-// 生命周期钩子
-onMounted(() => {
-  nextTick(() => {
-    initChart();
-    initWebSocket();
-    window.addEventListener('resize', handleResize);
-  });
-});
-
-onUnmounted(() => {
-  if (ws) {
-    ws.close();
+  if (isPlaying.value) {
+    scheduleWaveformUpdate();
   }
-  chart.value?.dispose();
-  window.removeEventListener('resize', handleResize);
-});
+};
 
 const clearWaveform = () => {
   dataBuffer.value = [];
   totalPoints.value = 0;
+  dataRate.value = 0;
+  startTime = Date.now();
+  currentTimeOffset = 0;
+  lastDataCount = 0;
+  
   if (chart.value) {
     chart.value.setOption({
-      xAxis: { min: 0, max: 2 }, // 重置为初始时间范围
+      xAxis: { min: 0, max: DISPLAY_TIME_WINDOW },
       series: [{ data: [] }]
     });
   }
+  console.log('波形已清空，时间轴重置');
 };
 
-// 监听播放状态（恢复播放时更新滚动波形）
+// 响应窗口大小变化
+const handleResize = () => {
+  chart.value?.resize();
+};
+
+// 生命周期钩子
+onMounted(() => {
+  initChart();
+  initWebSocket();
+  window.addEventListener('resize', handleResize);
+});
+
+onUnmounted(() => {
+  if (ws) ws.close();
+  chart.value?.dispose();
+  window.removeEventListener('resize', handleResize);
+});
+
 watch(isPlaying, (newVal) => {
-  if (newVal && chart.value && dataBuffer.value.length > 0) {
-    updateScrollingWaveform();
+  if (newVal) {
+    scheduleWaveformUpdate();
   }
 });
 </script>
