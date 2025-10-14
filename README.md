@@ -78,6 +78,7 @@ graph TD
 ## 组件化开发
 
 1.完成src/components下的vue组件开发
+
 2.使用axios发送HTTP请求
 
 
