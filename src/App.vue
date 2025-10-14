@@ -1,10 +1,30 @@
 <template>
-  <div id="app">
-    <router-view></router-view>
-  </div>
+
+    <div class="common-layout">
+      <el-container>
+        <el-aside width="200px">
+          <Aside />
+        </el-aside>
+        <el-container>
+          <!-- <el-header>
+            <Header />
+          </el-header> -->
+          <el-main>
+            <router-view></router-view>
+          </el-main>
+          <el-footer>
+            <Footer />
+          </el-footer>
+        </el-container>
+      </el-container>
+    </div>
+
 </template>
 
 <script setup>
+import Aside from './layout/Aside.vue'
+import Header from './layout/Header.vue';
+import Footer from './layout/Footer.vue';
 
 </script>
 
