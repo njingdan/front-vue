@@ -76,7 +76,7 @@ graph TD
 ```
 
 ```
-front-demo/                  # 项目根目录
+front-vue/                  # 项目根目录
 ├── public/                  # 静态资源（不经过编译，直接复制）
 │   └── index.html           # 入口 HTML（挂载 Vue 实例）
 ├── src/                     # 源代码核心目录
