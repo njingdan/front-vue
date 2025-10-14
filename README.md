@@ -46,29 +46,7 @@ npm run build
 
 ### 目录结构树
 
-front-demo/                  # 项目根目录
-├── public/                  # 静态资源（不经过编译，直接复制）
-│   └── index.html           # 入口 HTML（挂载 Vue 实例）
-├── src/                     # 源代码核心目录
-│   ├── assets/              # 资源文件（图片、全局样式、字体等）
-│   ├── axios/               # 网络请求配置（拦截器、API 封装）
-│   ├── components/          # 业务组件（按功能划分）
-│   │   ├── DataPacketEncryption.vue  # 数据包加密组件
-│   │   ├── DeviceAuthentication.vue  # 设备认证组件
-│   │   ├── KeyDistribution.vue       # 秘钥分发组件
-│   │   ├── KeyManagement.vue         # 秘钥管理组件
-│   │   ├── LogManagement.vue         # 日志管理组件
-│   │   └── WaveformViewer.vue        # 波形查看器组件
-│   ├── layout/              # 布局组件（如侧边栏、头部导航）
-│   ├── router/              # 路由配置（路由规则、导航守卫）
-│   ├── stores/              # 状态管理（Pinia 仓库，全局数据共享）
-│   ├── utils/               # 工具函数（格式化、验证、常量等）
-│   ├── App.vue              # 根组件（页面入口，组织布局和路由出口）
-│   └── main.js              # 入口文件（初始化 Vue 实例、挂载插件）
-├── .gitignore               # Git 忽略配置（排除 node_modules 等）
-├── package.json             # 项目依赖和脚本配置
-└── README.md                # 项目说明文档
-
+front-demo/ # 项目根目录├── public/ # 静态资源（不经过编译，直接复制）│ └── index.html # 入口 HTML（挂载 Vue 实例）├── src/ # 源代码核心目录│ ├── assets/ # 资源文件（图片、全局样式、字体等）│ ├── axios/ # 网络请求配置（拦截器、API 封装）│ ├── components/ # 业务组件（按功能划分）│ │ ├── DataPacketEncryption.vue # 数据包加密组件│ │ ├── DeviceAuthentication.vue # 设备认证组件│ │ ├── KeyDistribution.vue # 秘钥分发组件│ │ ├── KeyManagement.vue # 秘钥管理组件│ │ ├── LogManagement.vue # 日志管理组件│ │ └── WaveformViewer.vue # 波形查看器组件│ ├── layout/ # 布局组件（如侧边栏、头部导航）│ ├── router/ # 路由配置（路由规则、导航守卫）│ ├── stores/ # 状态管理（Pinia 仓库，全局数据共享）│ ├── utils/ # 工具函数（格式化、验证、常量等）│ ├── App.vue # 根组件（页面入口，组织布局和路由出口）│ └── main.js # 入口文件（初始化 Vue 实例、挂载插件）├── .gitignore # Git 忽略配置（排除 node_modules 等）├── package.json # 项目依赖和脚本配置└── README.md # 项目说明文档
 
 
 ### 核心模块关系
