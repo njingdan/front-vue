@@ -48,7 +48,7 @@ npm run build
 
 ```mermaid
 graph TD
-    root[front-demo/ 项目根目录]
+    root[front-vue/ 项目根目录]
     root --> public[public/ 静态资源]
     public --> indexhtml[index.html 入口HTML]
     
