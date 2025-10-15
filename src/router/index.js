@@ -14,22 +14,22 @@ const router = createRouter({
       children: [
         {
           path: "collect",
-          component: () => import("@/components/WaveformViewer.vue"),
+          component: () => import("@/views/WaveformViewer.vue"),
         },
         {
           path: "key-manage",
-          component: () => import("@/components/KeyManagement.vue"),
+          component: () => import("@/views/KeyManagement.vue"),
         },
         {
           path: "key-distribute",
-          component: () => import("@/components/KeyDistribution.vue"),
+          component: () => import("@/views/KeyDistribution.vue"),
         },
         {
           path: "encrypt",
-          component: () => import("@/components/DataPacketEncryption.vue"),
+          component: () => import("@/views/DataPacketEncryption.vue"),
         },
-        { path: "auth", component: () => import("@/components/DeviceAuthentication.vue") },
-        { path: "log", component: () => import("@/components/LogManagement.vue") },
+        { path: "auth", component: () => import("@/views/DeviceAuthentication.vue") },
+        { path: "log", component: () => import("@/views/LogManagement.vue") },
       ],
     },
   ],
