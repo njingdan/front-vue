@@ -42,11 +42,41 @@ npm run dev
 npm run build
 ```
 
-## 前端基本架构
+## 前端项目架构图
 
-### 目录结构树
+### 目录结构
 
-front-demo/                  # 项目根目录
+```mermaid
+graph TD
+    root[front-vue/ 项目根目录]
+    root --> public[public/ 静态资源]
+    public --> indexhtml[index.html 入口HTML]
+    
+    root --> src[src/ 源代码核心目录]
+    src --> assets[assets/ 资源文件]
+    src --> axios[axios/ 网络请求配置]
+    src --> components[components/ 业务组件]
+    components --> c1[DataPacketEncryption.vue 数据包加密]
+    components --> c2[DeviceAuthentication.vue 设备认证]
+    components --> c3[KeyDistribution.vue 秘钥分发]
+    components --> c4[KeyManagement.vue 秘钥管理]
+    components --> c5[LogManagement.vue 日志管理]
+    components --> c6[WaveformViewer.vue 波形查看器]
+    
+    src --> layout[layout/ 布局组件]
+    src --> router[router/ 路由配置]
+    src --> stores[stores/ 状态管理]
+    src --> utils[utils/ 工具函数]
+    src --> app[App.vue 根组件]
+    src --> main[main.js 入口文件]
+    
+    root --> gitignore[.gitignore Git忽略配置]
+    root --> package[package.json 依赖配置]
+    root --> readme[README.md 项目说明]
+```
+
+```
+front-vue/                  # 项目根目录
 ├── public/                  # 静态资源（不经过编译，直接复制）
 │   └── index.html           # 入口 HTML（挂载 Vue 实例）
 ├── src/                     # 源代码核心目录
@@ -68,44 +98,50 @@ front-demo/                  # 项目根目录
 ├── .gitignore               # Git 忽略配置（排除 node_modules 等）
 ├── package.json             # 项目依赖和脚本配置
 └── README.md                # 项目说明文档
-
-
+```
 
 ### 核心模块关系
 
+```
 ┌─────────────────────────────────────────────────────────┐
-│  入口层（初始化）                                                                                                                           │
-│  ├─ index.html（页面容器）                                                                                                         │
-│  └─ main.js（挂载 Vue 实例、路由、状态管理等）                                                                    │
+│  入口层（初始化）                                        │
+│  ├─ index.html（页面容器）                               │
+│  └─ main.js（挂载 Vue 实例、路由、状态管理等）             │
 └───────────────────────────┬─────────────────────────────┘
-                                                                            ▼
+                            ▼
 ┌─────────────────────────────────────────────────────────┐
-│  根组件层                                                                                                                                           │
-│  └─ App.vue（整合布局组件 + 路由出口 <router-view>）                                                    │
+│  根组件层                                                │
+│  └─ App.vue（整合布局组件 + 路由出口 <router-view>）      │
 └───────────────────────────┬─────────────────────────────┘
-                                                                            ▼
+                            ▼
 ┌─────────────────────────────────────────────────────────┐
-│  布局与路由层                                                                                                                                   │
-│  ├─ layout/（侧边栏、头部等布局组件）                                                                                     │
-│  └─ router/（路由配置，关联 URL 与业务组件）                                                                        │
+│  布局与路由层                                            │
+│  ├─ layout/（侧边栏、头部等布局组件）                     │
+│  └─ router/（路由配置，关联 URL 与业务组件）               │
 └───────────────────────────┬─────────────────────────────┘
-                                                                            ▼
+                            ▼
 ┌─────────────────────────────────────────────────────────┐
-│  业务组件层（核心功能）                                                                                                                │
-│  ├─ 数据加密相关：DataPacketEncryption.vue                                                                          │
-│  ├─ 设备管理相关：DeviceAuthentication.vue                                                                           │
-│  ├─ 秘钥管理相关：KeyManagement.vue、KeyDistribution.vue                                            │
-│  ├─ 日志与波形：LogManagement.vue、WaveformViewer.vue                                             │
-│  └─ ...（其他业务组件）                                                                                                                  │
+│  业务组件层（核心功能）                                   │
+│  ├─ 数据加密相关：DataPacketEncryption.vue               │
+│  ├─ 设备管理相关：DeviceAuthentication.vue               │
+│  ├─ 秘钥管理相关：KeyManagement.vue、KeyDistribution.vue │
+│  ├─ 日志与波形：LogManagement.vue、WaveformViewer.vue    │
+│  └─ ...（其他业务组件）                                  │
 └───────────────────────────┬─────────────────────────────┘
-                                                                            ▼
+                            ▼
 ┌─────────────────────────────────────────────────────────┐
-│  基础设施层（支撑功能）                                                                                                                │
-│  ├─ axios/（网络请求，连接后端 API）                                                                                        │
-│  ├─ stores/（全局状态管理，组件间数据共享）                                                                          │
-│  └─ utils/（工具函数，如数据格式化、加密工具等）                                                                  │
+│  基础设施层（支撑功能）                                   │
+│  ├─ axios/（网络请求，连接后端 API）                      │
+│  ├─ stores/（全局状态管理，组件间数据共享）                │
+│  └─ utils/（工具函数，如数据格式化、加密工具等）           │
 └─────────────────────────────────────────────────────────┘
+```
 
+## 组件化开发
+
+1.完成src/components下的vue组件开发
+
+2.使用axios发送HTTP请求
 
 
 
