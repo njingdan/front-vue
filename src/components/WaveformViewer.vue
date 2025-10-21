@@ -1,236 +1,233 @@
 <template>
-  <div class="waveform-container">
-    <div ref="chartRef" class="chart-wrapper"></div>
-    <div class="control-bar">
-      <button @click="togglePlay" class="btn">
-        {{ isPlaying ? '暂停' : '继续' }}
-      </button>
-      <button @click="clearWaveform" class="btn btn-clear">清空波形</button>
+  <div class="waveform-section">
+    <h3 class="title">实时波形（Time vs Amplitude）</h3>
+
+    <!-- 上：波形图 -->
+    <div ref="chartRef" class="chart-box"></div>
+
+    <!-- 下：控制面板 -->
+    <div class="panel">
+      <div class="row">
+        <button @click="togglePlay" class="btn">{{ isPlaying ? '暂停' : '继续' }}</button>
+        <button @click="clearWaveform" class="btn btn-clear">清空</button>
+        <label class="follow">
+          <input type="checkbox" v-model="followLive" />
+          跟随实时
+        </label>
+      </div>
       <div class="stats">
-        <span>接收数据点：{{ totalPoints }} 个</span>
-        <span>当前帧率：{{ fps.toFixed(1) }} FPS</span>
-        <span>数据速率：{{ dataRate.toFixed(1) }} K点/秒</span>
+        <div>接收数据点：{{ totalPoints }} 个</div>
+        <div>帧率：{{ fps.toFixed(1) }} FPS</div>
+        <div>数据速率：{{ dataRate.toFixed(1) }} K点/秒</div>
+        <div>显示窗口：{{ DISPLAY_TIME_WINDOW }} s</div>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue';
+import { ref, onMounted, onUnmounted, watch } from 'vue';
 import * as echarts from 'echarts';
+import http, { getServerUrl } from '@/axios/request';
 
-// 状态管理
 const chartRef = ref(null);
 const chart = ref(null);
+
 const isPlaying = ref(true);
+const followLive = ref(true);
 const totalPoints = ref(0);
 const fps = ref(0);
 const dataRate = ref(0);
-const dataBuffer = ref([]);
-let ws = null;
+
+const dataBuffer = ref([]); // [[t, amp], ...]
+let es = null;
 let frameCount = 0;
 let lastFpsTime = Date.now();
 let lastDataCount = 0;
 
-// 时间轴关键变量
-let startTime = null;
+// 采样率（优先用后端给的 sampleRate；否则用 1MHz 作为默认，与你的 Python 脚本一致）
+const DEFAULT_SAMPLE_RATE = 1_000_000;
+let sampleRateHz = DEFAULT_SAMPLE_RATE;
+
+// 时间轴与窗口参数
+const DISPLAY_TIME_WINDOW = 2; // 显示最近 2 秒，避免横轴过长导致标签挤压
+const MAX_POINTS = DISPLAY_TIME_WINDOW * (sampleRateHz / 1000) * 100; // 估算窗口点数（会随 sampleRate 更新）
+
+// 时间游标（以秒计）
 let currentTimeOffset = 0;
 
-// 高频数据配置（1000:1降采样）
-const MAX_BUFFER_SIZE = 10*10*1000/10;         // 缓冲区：10秒数据（10点/批 × 100批/秒 × 10秒 = 5000点）
-const DISPLAY_TIME_WINDOW = 10;       // 显示10秒窗口
-const BATCH_INTERVAL_MS = 10;         // 后端每10ms发送一批
-const EXPECTED_POINTS_PER_BATCH = 10; // 期望每批10个点（1000:1降采样后）
-
-// 计算时间参数
-const POINTS_PER_SECOND = 1000 / BATCH_INTERVAL_MS * EXPECTED_POINTS_PER_BATCH; // 1000点/秒
-const POINT_INTERVAL = 1 / POINTS_PER_SECOND; // 每个点的时间间隔：0.001秒
-
-// 初始化ECharts图表
+// 初始化图表（强化网格线显示）
 const initChart = () => {
   if (!chartRef.value) return;
+  chart.value = echarts.init(chartRef.value, undefined, { renderer: 'canvas' });
 
-  chart.value = echarts.init(chartRef.value);
-
-  const option = {
+  chart.value.setOption({
+    backgroundColor: '#ffffff',
     animation: false,
-    tooltip: {
-      trigger: 'axis',
-      axisPointer: {
-        type: 'line'
-      },
-      formatter: (params) => {
-        const point = params[0];
-        return `时间: ${point.value[0].toFixed(3)}秒<br/>幅值: ${point.value[1].toFixed(4)}`;
-      }
-    },
     grid: {
-      left: '3%',
-      right: '4%',
-      bottom: '15%',
-      top: '10%',
+      left: 72,
+      right: 28,
+      top: 26,
+      bottom: 72,
       containLabel: true
     },
+    tooltip: {
+      trigger: 'axis',
+      axisPointer: { type: 'cross' },
+      formatter: (params) => {
+        const p = params?.[0];
+        if (!p) return '';
+        return `时间: ${p.value[0].toFixed(6)} s<br/>幅值: ${p.value[1].toFixed(4)}`;
+      }
+    },
+    dataZoom: [
+      { type: 'inside', xAxisIndex: 0, throttle: 30, filterMode: 'none' },
+      { type: 'slider', xAxisIndex: 0, height: 18, bottom: 14, realtime: true, filterMode: 'none' }
+    ],
     xAxis: {
       type: 'value',
       name: '时间（秒）',
       nameLocation: 'end',
-      nameTextStyle: {
-        fontSize: 12,
-        padding: [5, 0, 0, 0]
+      nameGap: 20,
+      boundaryGap: false,
+      axisLine: { show: true, lineStyle: { color: '#666', width: 1 } },
+      axisTick: { show: true, lineStyle: { color: '#666' } },
+      axisLabel: { 
+        color: '#333', 
+        margin: 12,
+        formatter: (v) => Number.isInteger(v) ? v.toFixed(0) : ''
       },
-      axisLine: { show: true, lineStyle: { color: '#ccc' } },
-      axisTick: { show: false },
-      splitLine: { show: false },
-      min: 0,
-      max: DISPLAY_TIME_WINDOW,
-      axisLabel: {
-        formatter: function(value) {
-          return value % 1 === 0 ? value.toFixed(0) : '';
-        }
+      // 强化 x 轴网格线
+      splitLine: { 
+        show: true, 
+        lineStyle: { 
+          color: '#e0e0e0', 
+          width: 1,
+          type: 'solid'
+        },
+        interval: 'auto'
       }
     },
     yAxis: {
       type: 'value',
       name: '信号幅值',
       nameLocation: 'end',
-      min: 0,
-      max: 0.6,
-      axisLine: { show: true, lineStyle: { color: '#ccc' } },
-      splitLine: { show: false }
+      nameGap: 16,
+      axisLine: { show: true, lineStyle: { color: '#666', width: 1 } },
+      axisTick: { show: true, lineStyle: { color: '#666' } },
+      axisLabel: { color: '#333', margin: 10 },
+      // 强化 y 轴网格线
+      splitLine: { 
+        show: true, 
+        lineStyle: { 
+          color: '#e0e0e0', 
+          width: 1,
+          type: 'solid'
+        },
+        interval: 'auto'
+      },
+      scale: true
     },
-    series: [{
-      name: '波形数据',
-      type: 'line',
-      data: [],
-      showSymbol: false,
-      smooth: false,
-      lineStyle: { width: 1, color: '#1890ff' },
-      areaStyle: {
-        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-          { offset: 0, color: 'rgba(24, 144, 255, 0.3)' },
-          { offset: 1, color: 'rgba(24, 144, 255, 0.1)' }
-        ])
+    series: [
+      {
+        name: 'Waveform',
+        type: 'line',
+        data: [],
+        showSymbol: true,
+        symbol: 'circle',
+        symbolSize: 2,
+        smooth: false,
+        lineStyle: { width: 1, color: '#1f77b4' },
+        itemStyle: { color: '#1f77b4' },
+        sampling: 'lttb',
+        clip: true
       }
-    }]
-  };
-
-  chart.value.setOption(option);
+    ]
+  });
 };
 
-// 初始化WebSocket连接
-const initWebSocket = () => {
-  const wsUrl = `ws://${window.location.hostname}:8080/gnuradio/ws`;
-  console.log('连接WebSocket:', wsUrl);
-  console.log('高频数据配置（1000:1降采样）:', {
-    batchInterval: BATCH_INTERVAL_MS + 'ms',
-    expectedPointsPerBatch: EXPECTED_POINTS_PER_BATCH,
-    pointsPerSecond: POINTS_PER_SECOND,
-    displayWindow: DISPLAY_TIME_WINDOW + '秒',
-    totalBufferPoints: MAX_BUFFER_SIZE
-  });
+// 解包后端返回
+const extractSamples = (body) => {
+  // REST: StandardResponse<WaveformDataDto> -> resp.data.data
+  // SSE: 直接就是 WaveformDataDto
+  // 字段：优先 magnitude；兜底 samples/amplitude/real（real 仅演示用途）
+  let samples = body?.magnitude || body?.samples || body?.amplitude || body?.real || [];
+  if (!Array.isArray(samples)) samples = [];
+  if (typeof body?.sampleRate === 'number' && body.sampleRate > 0) {
+    sampleRateHz = body.sampleRate;
+  }
+  return samples;
+};
 
+// 将一帧样本映射为 [time, amp]
+const appendSamples = (samples) => {
+  if (!samples || samples.length === 0) return;
+  const pointInterval = 1 / (sampleRateHz || DEFAULT_SAMPLE_RATE);
+  for (let i = 0; i < samples.length; i++) {
+    dataBuffer.value.push([currentTimeOffset + i * pointInterval, samples[i]]);
+  }
+  currentTimeOffset += samples.length * pointInterval;
+
+  // 根据采样率动态估算窗口点数，限制缓冲区大小，避免滑块和轴被挤出边界
+  const maxPointsNow = Math.max(2_000, Math.floor(DISPLAY_TIME_WINDOW * sampleRateHz / 10)); // 稍微保守
+  while (dataBuffer.value.length > maxPointsNow) {
+    dataBuffer.value.shift();
+  }
+  totalPoints.value += samples.length;
+};
+
+// REST 首帧
+const fetchInitial = async () => {
   try {
-    ws = new WebSocket(wsUrl);
-
-    ws.onopen = () => {
-      console.log('WebSocket连接成功，开始接收高频波形数据（1000:1降采样）');
-      startTime = Date.now();
-      currentTimeOffset = 0;
-      lastDataCount = 0;
-    };
-
-    ws.onmessage = (event) => {
-      if (!isPlaying.value || !startTime) return;
-      
-      try {
-        const response = JSON.parse(event.data);
-        if (!response.magnitudes || !Array.isArray(response.magnitudes)) {
-          console.warn('无效的数据格式:', response);
-          return;
-        }
-        
-        const newData = response.magnitudes;
-        const actualPoints = newData.length;
-        
-        // 验证数据点数（期望每批10个点）
-        if (actualPoints !== EXPECTED_POINTS_PER_BATCH) {
-          console.warn(`数据点数异常: 期望${EXPECTED_POINTS_PER_BATCH}, 实际${actualPoints}`);
-        }
-
-        totalPoints.value += actualPoints;
-        frameCount++;
-
-        processNewData(newData);
-        
-      } catch (error) {
-        console.error('解析波形数据失败：', error);
-      }
-    };
-
-    ws.onclose = () => {
-      console.warn('WebSocket连接关闭，3秒后重试...');
-      setTimeout(initWebSocket, 3000);
-    };
-
-    ws.onerror = (error) => {
-      console.error('WebSocket连接错误：', error);
-    };
-  } catch (error) {
-    console.error('创建WebSocket连接失败：', error);
+    const resp = await http.get('api/signal/waveform');
+    const body = resp?.data?.data ?? resp?.data;
+    const samples = extractSamples(body);
+    appendSamples(samples);
+    scheduleWaveformUpdate(true);
+  } catch (e) {
+    console.error('初次获取波形失败:', e);
   }
 };
 
-// 处理新数据（1000:1降采样优化）
-const processNewData = (newData) => {
-  if (!startTime || newData.length === 0) return;
+// SSE 订阅
+const startSse = () => {
+  const base = getServerUrl().replace(/\/+$/, '');
+  es = new EventSource(base + '/api/signal/stream');
 
-  // 计算实际时间间隔（每批10个点，每点0.001秒）
-  const batchDuration = newData.length * POINT_INTERVAL; // 0.01秒（10ms）
-  
-  const newDataPoints = newData.map((value, index) => {
-    const pointTime = currentTimeOffset + index * POINT_INTERVAL;
-    return [pointTime, value];
+  es.addEventListener('signal', (evt) => {
+    if (!isPlaying.value) return;
+    try {
+      const payload = JSON.parse(evt.data);
+      const samples = extractSamples(payload);
+      appendSamples(samples);
+      scheduleWaveformUpdate(false);
+    } catch (e) {
+      // ignore
+    }
   });
 
-  currentTimeOffset += batchDuration;
-
-  // 添加到缓冲区
-  dataBuffer.value.push(...newDataPoints);
-
-  // 缓冲区管理（保留最近10秒数据）
-  if (dataBuffer.value.length > MAX_BUFFER_SIZE) {
-    const removeCount = dataBuffer.value.length - MAX_BUFFER_SIZE;
-    dataBuffer.value = dataBuffer.value.slice(removeCount);
-  }
-
-  // 计算数据速率（点/秒）
-  const currentTime = Date.now();
-  if (currentTime - lastFpsTime >= 1000) {
-    const newPoints = totalPoints.value - lastDataCount;
-    dataRate.value = newPoints / 1000; // 转换为K点/秒
-    lastDataCount = totalPoints.value;
-    
-    console.log(`数据速率: ${dataRate.value.toFixed(1)}K点/秒, 缓冲区: ${dataBuffer.value.length}点`);
-  }
-
-  scheduleWaveformUpdate();
+  es.addEventListener('error', () => {
+    // 简单重连
+    if (es) es.close();
+    setTimeout(startSse, 1500);
+  });
 };
 
-// 渲染调度（性能优化）
+// 渲染节流
 let updateScheduled = false;
 let lastRenderTime = 0;
-const MIN_RENDER_INTERVAL = 100; // 最小渲染间隔100ms（最大10FPS）
+const MIN_RENDER_INTERVAL = 80; // 略高刷新，保证滑块顺畅
 
-const scheduleWaveformUpdate = () => {
+const scheduleWaveformUpdate = (initial = false) => {
+  if (initial) {
+    updateWaveformDisplay();
+    return;
+  }
   if (updateScheduled) return;
-  
   updateScheduled = true;
-  
   requestAnimationFrame(() => {
     updateScheduled = false;
     const now = Date.now();
-    
     if (now - lastRenderTime >= MIN_RENDER_INTERVAL) {
       updateWaveformDisplay();
       lastRenderTime = now;
@@ -238,163 +235,147 @@ const scheduleWaveformUpdate = () => {
   });
 };
 
-// 更新波形显示
+// 刷新图表（不强设 xAxis min/max；用 dataZoom 控制窗口；动态 y 轴）
 const updateWaveformDisplay = () => {
   if (!chart.value || dataBuffer.value.length === 0) return;
-  
-  try {
-    const latestTime = currentTimeOffset;
-    const displayStart = Math.max(0, latestTime - DISPLAY_TIME_WINDOW);
-    const displayEnd = Math.max(DISPLAY_TIME_WINDOW, latestTime);
 
-    // 筛选显示范围内的数据点
-    const displayData = dataBuffer.value.filter(point => 
-      point[0] >= displayStart && point[0] <= displayEnd
-    );
+  const seriesData = dataBuffer.value.slice();
 
-    // 更新图表
-    chart.value.setOption({
-      xAxis: { 
-        min: displayStart,
-        max: displayEnd
-      },
-      series: [{ 
-        data: displayData 
-      }]
-    }, { notMerge: false, lazyUpdate: true });
+  // y 轴范围（留 10% padding）
+  let yMin = Infinity, yMax = -Infinity;
+  for (let i = 0; i < seriesData.length; i++) {
+    const v = seriesData[i][1];
+    if (v < yMin) yMin = v;
+    if (v > yMax) yMax = v;
+  }
+  if (!isFinite(yMin) || !isFinite(yMax)) { yMin = -1; yMax = 1; }
+  if (yMin === yMax) {
+    const pad = Math.max(Math.abs(yMax) * 0.1, 0.1);
+    yMin -= pad; yMax += pad;
+  } else {
+    const pad = (yMax - yMin) * 0.1;
+    yMin -= pad; yMax += pad;
+  }
 
-    // 更新FPS
-    const currentTime = Date.now();
-    if (currentTime - lastFpsTime >= 1000) {
-      fps.value = frameCount;
-      frameCount = 0;
-      lastFpsTime = currentTime;
-    }
-    
-  } catch (error) {
-    console.error('更新波形显示失败:', error);
+  chart.value.setOption({
+    yAxis: { min: yMin, max: yMax },
+    series: [{ data: seriesData }]
+  }, { notMerge: false, lazyUpdate: true });
+
+  // 跟随实时：滑动 dataZoom 窗口到末尾 [tEnd - WINDOW, tEnd]
+  if (followLive.value && seriesData.length > 0) {
+    const tEnd = seriesData[seriesData.length - 1][0];
+    const tStart = Math.max(0, tEnd - DISPLAY_TIME_WINDOW);
+    chart.value.dispatchAction({
+      type: 'dataZoom',
+      dataZoomIndex: 0,
+      startValue: tStart,
+      endValue: tEnd
+    });
+    chart.value.dispatchAction({
+      type: 'dataZoom',
+      dataZoomIndex: 1,
+      startValue: tStart,
+      endValue: tEnd
+    });
+  }
+
+  // FPS & 速率
+  const now = Date.now();
+  if (now - lastFpsTime >= 1000) {
+    fps.value = frameCount;
+    frameCount = 0;
+    lastFpsTime = now;
+    dataRate.value = (totalPoints.value - lastDataCount) / 1000;
+    lastDataCount = totalPoints.value;
+  } else {
+    frameCount++;
   }
 };
 
-// 控制方法
+// 控件
 const togglePlay = () => {
   isPlaying.value = !isPlaying.value;
-  if (isPlaying.value) {
-    scheduleWaveformUpdate();
-  }
+  if (isPlaying.value) scheduleWaveformUpdate();
 };
-
 const clearWaveform = () => {
   dataBuffer.value = [];
   totalPoints.value = 0;
   dataRate.value = 0;
-  startTime = Date.now();
   currentTimeOffset = 0;
-  lastDataCount = 0;
-  
-  if (chart.value) {
-    chart.value.setOption({
-      xAxis: { min: 0, max: DISPLAY_TIME_WINDOW },
-      series: [{ data: [] }]
-    });
-  }
-  console.log('波形已清空，时间轴重置');
+  chart.value?.setOption({ yAxis: { min: -1, max: 1 }, series: [{ data: [] }] });
 };
 
-// 响应窗口大小变化
-const handleResize = () => {
-  chart.value?.resize();
-};
-
-// 生命周期钩子
-onMounted(() => {
+// 生命周期
+onMounted(async () => {
   initChart();
-  initWebSocket();
-  window.addEventListener('resize', handleResize);
+  await fetchInitial();
+  startSse();
+  window.addEventListener('resize', () => chart.value?.resize());
 });
-
 onUnmounted(() => {
-  if (ws) ws.close();
+  if (es) es.close();
   chart.value?.dispose();
-  window.removeEventListener('resize', handleResize);
 });
-
-watch(isPlaying, (newVal) => {
-  if (newVal) {
-    scheduleWaveformUpdate();
-  }
-});
+watch(isPlaying, (v) => { if (v) scheduleWaveformUpdate(); });
 </script>
 
 <style scoped>
-.waveform-container {
+.waveform-section {
+  padding: 20px 20px 14px;
+  background: #f7f9fc;
+  border-radius: 10px;
+  border: 1px solid #eef2f6;
+  max-width: 1200px;
+  margin: 16px auto;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+}
+.title {
+  margin: 0 0 14px 0;
+  font-size: 16px;
+  color: #111827;
+}
+.chart-box {
   width: 100%;
-  height: 100%;
-  min-height: 500px;
-  padding: 20px;
-  box-sizing: border-box;
-  background-color: #fff;
+  height: 500px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
   border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
-
-.chart-wrapper {
-  width: 100%;
-  height: calc(100% - 60px);
-  border: 1px solid #eee;
-  border-radius: 4px;
+.panel {
+  margin-top: 12px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 12px 14px;
 }
-
-.control-bar {
+.row {
   display: flex;
-  align-items: center;
-  gap: 15px;
-  margin-top: 10px;
-  height: 50px;
+  gap: 10px;
+  margin-bottom: 8px;
 }
-
+.follow { margin-left: 8px; color: #374151; font-size: 13px; }
 .btn {
-  padding: 8px 16px;
+  padding: 6px 12px;
   border: none;
   border-radius: 4px;
-  background-color: #1890ff;
+  background: #1f77b4;
   color: #fff;
   cursor: pointer;
-  font-size: 14px;
-  transition: background-color 0.2s;
+  font-size: 13px;
 }
-
-.btn:hover {
-  background-color: #096dd9;
-}
-
-.btn-clear {
-  background-color: #ff4d4f;
-}
-
-.btn-clear:hover {
-  background-color: #d9363e;
-}
-
+.btn:hover { background: #1a5fa1; }
+.btn-clear { background: #ef4444; }
+.btn-clear:hover { background: #dc2626; }
 .stats {
-  margin-left: auto;
-  display: flex;
-  gap: 20px;
-  font-size: 14px;
-  color: #666;
+  display: grid;
+  grid-template-columns: repeat(4, auto);
+  gap: 10px 16px;
+  font-size: 12px;
+  color: #374151;
 }
-
-@media (max-width: 768px) {
-  .control-bar {
-    flex-direction: column;
-    height: auto;
-    gap: 10px;
-  }
-
-  .stats {
-    margin-left: 0;
-    justify-content: space-between;
-    width: 100%;
-  }
+@media (max-width: 920px) {
+  .chart-box { height: 420px; }
+  .stats { grid-template-columns: 1fr 1fr; }
 }
 </style>
