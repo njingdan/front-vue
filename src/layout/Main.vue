@@ -4,17 +4,31 @@
     
     <!-- 储能柜选择区域 -->
     <div class="cabinet-selector">
-      <div class="selector-title">储能柜选择</div>
-      <div class="cabinet-buttons">
-        <el-button 
-          v-for="i in 6" 
-          :key="i"
-          type="primary" 
-          @click="handleCabinetClick(i)"
-          class="cabinet-btn"
-        >
-          储能柜 {{ i }}
-        </el-button>
+      <div class="selector-title">储能柜管理</div>
+      <div class="selector-content">
+        <div class="select-wrapper">
+          <el-select
+            v-model="selectedCabinet"
+            placeholder="请选择储能柜"
+            class="cabinet-select"
+            @change="handleCabinetSelect"
+          >
+            <el-option
+              v-for="i in 6"
+              :key="i"
+              :label="`储能柜 ${i}`"
+              :value="i"
+            />
+          </el-select>
+          <el-button 
+            type="success" 
+            @click="handleCabinetClick"
+            class="confirm-btn"
+            :disabled="!selectedCabinet"
+          >
+            查看密钥
+          </el-button>
+        </div>
       </div>
     </div>
 
@@ -34,6 +48,7 @@ let myChart = null;
 const keyDialogVisible = ref(false);
 const selectedDevice = ref('');
 const realtimeKey = ref('');
+const selectedCabinet = ref(null);
 let simulationTimer = null;
 
 // 统一颜色规范
@@ -43,11 +58,18 @@ const LINK_COLORS = {
   fault: '#ef4444'      // 红色 - 故障
 };
 
-// 储能柜点击处理
-const handleCabinetClick = (cabinetNumber) => {
-  selectedDevice.value = `分布式储能柜${cabinetNumber}`;
-  realtimeKey.value = Math.random().toString(36).substring(2, 10).toUpperCase();
-  keyDialogVisible.value = true;
+// 储能柜选择处理
+const handleCabinetSelect = (value) => {
+  selectedCabinet.value = value;
+};
+
+// 查看密钥按钮点击
+const handleCabinetClick = () => {
+  if (selectedCabinet.value) {
+    selectedDevice.value = `分布式储能柜${selectedCabinet.value}`;
+    realtimeKey.value = Math.random().toString(36).substring(2, 10).toUpperCase();
+    keyDialogVisible.value = true;
+  }
 };
 
 onMounted(() => {
@@ -56,7 +78,7 @@ onMounted(() => {
     height: 700
   });
 
-  // 创建基础节点数据
+  // 创建基础节点数据 - 优化布局，减少距离
   const createNodes = () => {
     const baseNodes = [
       { 
@@ -104,29 +126,25 @@ onMounted(() => {
       { 
         id: 'distributedBus', 
         name: '储能区总线', 
-        x: 600, y: 400, 
-        symbolSize: [500, 8],
+        x: 450, y: 400,
+        symbolSize: [400, 8],
         symbol: 'rect', 
         itemStyle: { borderColor: '#64748b', borderWidth: 1, color: '#e2e8f0' }, 
         label: { color: '#000', position: 'top', fontSize: 12 } 
       }
     ];
 
-    const distributedNodes = Array(6).fill().map((_, i) => ({
-      id: `distributed${i+1}`,
-      name: `分布式储能柜${i+1}`,
-      x: 350 + i * 100,
-      y: 480,
-      symbolSize: 50,
-      itemStyle: { 
-        borderColor: '#10b981', 
-        borderWidth: 2, 
-        color: '#d1fae5' 
-      },
-      label: { color: '#000', position: 'center', fontSize: 10 },
-      deviceType: 'distributed',
-      status: 'normal'
-    }));
+    // 储能柜布局优化 - 两行排列，更紧凑
+    const distributedNodes = [
+      // 第一行
+      { id: 'distributed1', name: '储能柜1', x: 300, y: 480, symbolSize: 45, itemStyle: { borderColor: '#10b981', borderWidth: 2, color: '#d1fae5' }, label: { color: '#000', position: 'center', fontSize: 10 }, deviceType: 'distributed', status: 'normal' },
+      { id: 'distributed2', name: '储能柜2', x: 380, y: 480, symbolSize: 45, itemStyle: { borderColor: '#10b981', borderWidth: 2, color: '#d1fae5' }, label: { color: '#000', position: 'center', fontSize: 10 }, deviceType: 'distributed', status: 'normal' },
+      { id: 'distributed3', name: '储能柜3', x: 460, y: 480, symbolSize: 45, itemStyle: { borderColor: '#10b981', borderWidth: 2, color: '#d1fae5' }, label: { color: '#000', position: 'center', fontSize: 10 }, deviceType: 'distributed', status: 'normal' },
+      // 第二行
+      { id: 'distributed4', name: '储能柜4', x: 340, y: 540, symbolSize: 45, itemStyle: { borderColor: '#10b981', borderWidth: 2, color: '#d1fae5' }, label: { color: '#000', position: 'center', fontSize: 10 }, deviceType: 'distributed', status: 'normal' },
+      { id: 'distributed5', name: '储能柜5', x: 420, y: 540, symbolSize: 45, itemStyle: { borderColor: '#10b981', borderWidth: 2, color: '#d1fae5' }, label: { color: '#000', position: 'center', fontSize: 10 }, deviceType: 'distributed', status: 'normal' },
+      { id: 'distributed6', name: '储能柜6', x: 500, y: 540, symbolSize: 45, itemStyle: { borderColor: '#10b981', borderWidth: 2, color: '#d1fae5' }, label: { color: '#000', position: 'center', fontSize: 10 }, deviceType: 'distributed', status: 'normal' }
+    ];
 
     return [...baseNodes, ...distributedNodes];
   };
@@ -185,16 +203,14 @@ onMounted(() => {
       }
     ];
 
-    const distributedLinks = Array(6).fill().map((_, i) => ({
-      source: 'distributedBus',
-      target: `distributed${i+1}`,
-      name: 'RS485',
-      status: 'normal',
-      lineStyle: { 
-        width: 2, 
-        opacity: 0.7
-      }
-    }));
+    const distributedLinks = [
+      { source: 'distributedBus', target: 'distributed1', name: 'RS485', status: 'normal', lineStyle: { width: 2, opacity: 0.7 } },
+      { source: 'distributedBus', target: 'distributed2', name: 'RS485', status: 'normal', lineStyle: { width: 2, opacity: 0.7 } },
+      { source: 'distributedBus', target: 'distributed3', name: 'RS485', status: 'normal', lineStyle: { width: 2, opacity: 0.7 } },
+      { source: 'distributedBus', target: 'distributed4', name: 'RS485', status: 'normal', lineStyle: { width: 2, opacity: 0.7 } },
+      { source: 'distributedBus', target: 'distributed5', name: 'RS485', status: 'normal', lineStyle: { width: 2, opacity: 0.7 } },
+      { source: 'distributedBus', target: 'distributed6', name: 'RS485', status: 'normal', lineStyle: { width: 2, opacity: 0.7 } }
+    ];
 
     return [...baseLinks, ...distributedLinks];
   };
@@ -419,29 +435,78 @@ onUnmounted(() => {
 
 .cabinet-selector {
   background: white;
-  padding: 20px;
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  padding: 25px;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   width: 100%;
   max-width: 1400px;
+  border: 1px solid #e2e8f0;
 }
 
 .selector-title {
-  font-size: 16px;
-  font-weight: bold;
-  margin-bottom: 15px;
-  color: #333;
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 20px;
+  color: #1f2937;
   text-align: center;
+  padding-bottom: 10px;
+  border-bottom: 2px solid #10b981;
 }
 
-.cabinet-buttons {
+.selector-content {
   display: flex;
   justify-content: center;
-  gap: 15px;
-  flex-wrap: wrap;
 }
 
-.cabinet-btn {
-  min-width: 100px;
+.select-wrapper {
+  display: flex;
+  gap: 15px;
+  align-items: center;
+  width: 400px;
+}
+
+.cabinet-select {
+  flex: 1;
+}
+
+.cabinet-select :deep(.el-input__inner) {
+  height: 44px;
+  border-radius: 8px;
+  border: 2px solid #e2e8f0;
+  font-size: 14px;
+}
+
+.cabinet-select :deep(.el-input__inner:focus) {
+  border-color: #10b981;
+}
+
+.confirm-btn {
+  height: 44px;
+  padding: 0 25px;
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #10b981, #059669);
+  border: none;
+  box-shadow: 0 2px 4px rgba(16, 185, 129, 0.3);
+  transition: all 0.3s ease;
+  white-space: nowrap;
+}
+
+.confirm-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(16, 185, 129, 0.4);
+  background: linear-gradient(135deg, #059669, #047857);
+}
+
+.confirm-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.confirm-btn:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }
 </style>
