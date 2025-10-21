@@ -147,6 +147,16 @@ front-vue/                  # 项目根目录
 
 2.使用axios发送HTTP请求
 
+### 约定
+
+1.Components为全局公用组件
+
+2.业务组件全部放在views下，按业务模块划分，可继续拆分子components
+
+3.每个views下的组件用到的请求封装在api中，便于维护
+
+
+
 
 
 
