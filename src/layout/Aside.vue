@@ -4,27 +4,39 @@ import {
     Menu as IconMenu,
     Location,
     Setting,
+    Operation,
+    Open
 } from '@element-plus/icons-vue'
 
+import { ref,computed } from 'vue'
+
 import { useRouter } from 'vue-router'
-const router = useRouter()
+
+
+import { useSidebarStore } from '@/store/sidebarStore'
+import { storeToRefs } from 'pinia'
+
+const sidebarStore = useSidebarStore()
+
+const { isExpanded } = storeToRefs(sidebarStore)
+const isCollapse = computed(() => !isExpanded.value) // 使用computed保持响应式关联
 
 const handleOpen = (key, keyPath) => {
-    console.log(key, keyPath)
+    // console.log(key, keyPath)
 }
 const handleClose = (key, keyPath) => {
-    console.log(key, keyPath)
+    // console.log(key, keyPath)
 }
 </script>
 
 <template>
 
-    <el-row class="tac">
-        <el-col :span="20">
-            <h5 class="mb-2" style="margin-bottom: 20px;">
-                <el-text class="mx-1" size="large" type="primary">安全通信演示系统</el-text>
-            </h5>
-            <el-menu router default-active="/" class="el-menu-vertical-demo" @open="handleOpen" @close="handleClose">
+    <el-row class="sidebar-container">
+
+        <el-col  class="sidebar-col">
+            
+
+            <el-menu :collapse="isCollapse" router default-active="/" class="sidebar-menu" @open="handleOpen" @close="handleClose">
 
                 <el-menu-item index="/">
                     <el-icon><icon-menu /></el-icon>
@@ -34,7 +46,7 @@ const handleClose = (key, keyPath) => {
                 <el-sub-menu index="/module">
                     <template #title>
                         <el-icon>
-                            <location />
+                            <Operation />
                         </el-icon>
                         <span>功能模块</span>
                     </template>
@@ -56,10 +68,32 @@ const handleClose = (key, keyPath) => {
                     <span>其他</span>
                 </el-menu-item>
             </el-menu>
+
         </el-col>
 
     </el-row>
 
 </template>
 
-<style scoped></style>
+<style scoped>
+
+/* 容器占满左侧高度 */
+.sidebar-container {
+  height: 100vh; /* 占满视口高度 */
+  margin: 0; /* 清除默认margin */
+  padding: 0; /* 清除默认padding */
+}
+
+.sidebar-col {
+  height: 100%; /* 继承父容器高度 */
+  background-color: #f5f5f5; /* 可选：统一背景色 */
+}
+
+/* 菜单样式调整 */
+.sidebar-menu {
+  height: 100%; /* 菜单占满父容器高度 */
+}
+
+
+
+</style>

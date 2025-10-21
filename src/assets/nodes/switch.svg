@@ -1,0 +1,14 @@
+<svg width="60" height="60" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
+  <rect x="10" y="15" width="40" height="30" rx="2" ry="2" fill="transparent" stroke="#64748b" stroke-width="2"/>
+  <rect x="12" y="17" width="36" height="26" rx="1" ry="1" fill="transparent" stroke="#64748b" stroke-width="1"/>
+  <g stroke="#64748b" stroke-width="1.5">
+    <circle cx="15" cy="25" r="2"/>
+    <circle cx="15" cy="35" r="2"/>
+    <circle cx="15" cy="45" r="2"/>
+    <circle cx="55" cy="25" r="2"/>
+    <circle cx="55" cy="35" r="2"/>
+    <circle cx="55" cy="45" r="2"/>
+  </g>
+  <path d="M30 22 L30 38 M22 30 L38 30" stroke="#64748b" stroke-width="1.5" stroke-dasharray="2,2"/>
+  <text x="30" y="65" font-family="Arial" font-size="10" text-anchor="middle" fill="#333">交换机</text>
+</svg>
