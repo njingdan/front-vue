@@ -1,6 +1,23 @@
 <template>
   <div class="topology-container">
     <div ref="chartRef" class="chart" />
+    
+    <!-- 储能柜选择区域 -->
+    <div class="cabinet-selector">
+      <div class="selector-title">储能柜选择</div>
+      <div class="cabinet-buttons">
+        <el-button 
+          v-for="i in 6" 
+          :key="i"
+          type="primary" 
+          @click="handleCabinetClick(i)"
+          class="cabinet-btn"
+        >
+          储能柜 {{ i }}
+        </el-button>
+      </div>
+    </div>
+
     <el-dialog v-model="keyDialogVisible" title="实时量子密钥" width="300px">
       <p>设备：{{ selectedDevice }}</p>
       <p>当前密钥：{{ realtimeKey }}</p>
@@ -24,6 +41,13 @@ const LINK_COLORS = {
   normal: '#10b981',    // 绿色 - 联通
   transferring: '#3b82f6', // 蓝色 - 数据流过
   fault: '#ef4444'      // 红色 - 故障
+};
+
+// 储能柜点击处理
+const handleCabinetClick = (cabinetNumber) => {
+  selectedDevice.value = `分布式储能柜${cabinetNumber}`;
+  realtimeKey.value = Math.random().toString(36).substring(2, 10).toUpperCase();
+  keyDialogVisible.value = true;
 };
 
 onMounted(() => {
@@ -179,32 +203,6 @@ onMounted(() => {
   const nodes = createNodes();
   const links = createLinks();
 
-  // 点击事件处理函数
-  const handleChartClick = (params) => {
-    console.log('点击事件触发:', params);
-    console.log('节点数据:', params.data);
-    
-    // 方法1：通过ID判断
-    if (params.data && params.data.id && params.data.id.startsWith('distributed')) {
-      console.log('检测到储能柜点击');
-      selectedDevice.value = params.data.name;
-      realtimeKey.value = Math.random().toString(36).substring(2, 10).toUpperCase();
-      keyDialogVisible.value = true;
-      return;
-    }
-    
-    // 方法2：通过deviceType判断
-    if (params.data && params.data.deviceType === 'distributed') {
-      console.log('检测到储能柜点击(deviceType)');
-      selectedDevice.value = params.data.name;
-      realtimeKey.value = Math.random().toString(36).substring(2, 10).toUpperCase();
-      keyDialogVisible.value = true;
-      return;
-    }
-    
-    console.log('点击的不是储能柜');
-  };
-
   const getOption = (currentNodes = nodes, currentLinks = links) => {
     const processedNodes = currentNodes.map(node => {
       const newNode = { ...node };
@@ -293,8 +291,6 @@ onMounted(() => {
               color: '#facc15'
             }
           },
-          // 使用外部定义的点击处理函数
-          onClick: handleChartClick,
           draggable: false,
         }
       ]
@@ -404,17 +400,48 @@ onUnmounted(() => {
   height: 100%;
   min-height: 700px;
   display: flex;
+  flex-direction: column;
   justify-content: center;
   align-items: center;
   overflow: auto;
   background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
   padding: 20px;
   box-sizing: border-box;
+  gap: 20px;
 }
+
 .chart {
   background-color: #f8fafc;
   border-radius: 8px;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-  cursor: pointer; /* 添加指针样式 */
+  flex-shrink: 0;
+}
+
+.cabinet-selector {
+  background: white;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  width: 100%;
+  max-width: 1400px;
+}
+
+.selector-title {
+  font-size: 16px;
+  font-weight: bold;
+  margin-bottom: 15px;
+  color: #333;
+  text-align: center;
+}
+
+.cabinet-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+  flex-wrap: wrap;
+}
+
+.cabinet-btn {
+  min-width: 100px;
 }
 </style>
