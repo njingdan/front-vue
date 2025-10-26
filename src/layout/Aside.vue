@@ -58,6 +58,7 @@ const handleClose = (key, keyPath) => {
                     <el-menu-item index="/module/encrypt">数据包加密</el-menu-item>
                     <el-menu-item index="/module/auth">设备认证</el-menu-item>
                     <el-menu-item index="/module/log">日志管理</el-menu-item>
+                    <el-menu-item index="/module/test">测试</el-menu-item>
                 </el-sub-menu>
 
 

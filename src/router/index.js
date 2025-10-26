@@ -34,6 +34,11 @@ const router = createRouter({
         },
         { path: "auth",name: "设备认证", component: () => import("@/views/DeviceAuthentication.vue") },
         { path: "log", name: "日志管理",component: () => import("@/views/LogManagement.vue") },
+        {
+          path: "test",
+          name: "测试组件",
+          component: () => import("@/views/index.vue"),
+        },
       ],
     },
   ],
