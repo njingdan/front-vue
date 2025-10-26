@@ -53,19 +53,21 @@ graph TD
     public --> indexhtml[index.html 入口HTML]
     
     root --> src[src/ 源代码核心目录]
-    src --> assets[assets/ 资源文件]
+    src --> assets[assets/ 静态资源文件]
     src --> axios[axios/ 网络请求配置]
-    src --> components[components/ 业务组件]
-    components --> c1[DataPacketEncryption.vue 数据包加密]
-    components --> c2[DeviceAuthentication.vue 设备认证]
-    components --> c3[KeyDistribution.vue 秘钥分发]
-    components --> c4[KeyManagement.vue 秘钥管理]
-    components --> c5[LogManagement.vue 日志管理]
-    components --> c6[WaveformViewer.vue 波形查看器]
+    src --> components[components/ 全局公用组件]
+    src --> api[api/ 业务组件对应请求]
+    src --> views[views/ 业务组件]
+    views --> c1[DataPacketEncryption.vue 数据包加密]
+    views --> c2[DeviceAuthentication.vue 设备认证]
+    views --> c3[KeyDistribution.vue 秘钥分发]
+    views --> c4[KeyManagement.vue 秘钥管理]
+    views --> c5[LogManagement.vue 日志管理]
+    views --> c6[WaveformViewer.vue 波形查看器]
     
     src --> layout[layout/ 布局组件]
     src --> router[router/ 路由配置]
-    src --> stores[stores/ 状态管理]
+    src --> store[store/ 状态管理]
     src --> utils[utils/ 工具函数]
     src --> app[App.vue 根组件]
     src --> main[main.js 入口文件]
@@ -82,7 +84,9 @@ front-vue/                  # 项目根目录
 ├── src/                     # 源代码核心目录
 │   ├── assets/              # 资源文件（图片、全局样式、字体等）
 │   ├── axios/               # 网络请求配置（拦截器、API 封装）
-│   ├── components/          # 业务组件（按功能划分）
+│   ├── components/          # 全局公用组件
+│   ├── api/                 # 业务组件对应请求
+├   ├── views/               # 业务组件（按功能划分）
 │   │   ├── DataPacketEncryption.vue  # 数据包加密组件
 │   │   ├── DeviceAuthentication.vue  # 设备认证组件
 │   │   ├── KeyDistribution.vue       # 秘钥分发组件
@@ -91,7 +95,7 @@ front-vue/                  # 项目根目录
 │   │   └── WaveformViewer.vue        # 波形查看器组件
 │   ├── layout/              # 布局组件（如侧边栏、头部导航）
 │   ├── router/              # 路由配置（路由规则、导航守卫）
-│   ├── stores/              # 状态管理（Pinia 仓库，全局数据共享）
+│   ├── store/               # 状态管理（Pinia 仓库，全局数据共享）
 │   ├── utils/               # 工具函数（格式化、验证、常量等）
 │   ├── App.vue              # 根组件（页面入口，组织布局和路由出口）
 │   └── main.js              # 入口文件（初始化 Vue 实例、挂载插件）
@@ -139,9 +143,19 @@ front-vue/                  # 项目根目录
 
 ## 组件化开发
 
-1.完成src/components下的vue组件开发
+1.完成src/views下的vue组件开发
 
 2.使用axios发送HTTP请求
+
+### 约定
+
+1.Components为全局公用组件
+
+2.业务组件全部放在views下，按业务模块划分，可继续拆分子components
+
+3.每个views下的组件用到的请求封装在api中，便于维护
+
+
 
 
 
