@@ -1,213 +1,172 @@
 <template>
   <div class="topology-container">
-    <div class="main-content">
+    <el-row class="main-content" :gutter="20">
       <!-- 左侧筛选面板 -->
-      <el-card class="filter-panel">
-        <div slot="header" class="panel-header">
-          <span>筛选面板</span>
-        </div>
-        
-        <div class="filter-content">
-          <!-- 图例说明 -->
-          <div class="legend-section">
-            <h4 class="section-title">图例说明</h4>
-            <div class="legend-item">
-              <span class="legend-dot gateway" /> 安全网关
+      <el-col :xs="24" :sm="8" :md="6" :lg="5" :xl="4">
+        <el-card class="filter-panel">
+          <div slot="header" class="panel-header">
+            <span>筛选面板</span>
+          </div>
+
+          <div class="filter-content">
+            <!-- 图例说明 -->
+            <div class="legend-section">
+              <h4 class="section-title">图例说明</h4>
+              <div class="legend-item">
+                <span class="legend-dot gateway" /> 安全网关
+              </div>
+              <div class="legend-item">
+                <span class="legend-dot switch" /> 交换机
+              </div>
+              <div class="legend-item">
+                <span class="legend-dot server" /> 服务器
+              </div>
+              <div class="legend-item">
+                <span class="legend-dot qkd" /> 量子密钥终端
+              </div>
+              <div class="legend-item">
+                <span class="legend-dot bus" /> 总线
+              </div>
+              <div class="legend-item">
+                <span class="legend-dot distributed" /> 储能柜
+              </div>
+              <div class="legend-line">
+                <span class="line-normal" /> 正常连接
+              </div>
+              <div class="legend-line">
+                <span class="line-transferring" /> 数据传输中
+              </div>
+              <div class="legend-line">
+                <span class="line-fault" /> 故障连接
+              </div>
             </div>
-            <div class="legend-item">
-              <span class="legend-dot switch" /> 交换机
-            </div>
-            <div class="legend-item">
-              <span class="legend-dot server" /> 服务器
-            </div>
-            <div class="legend-item">
-              <span class="legend-dot qkd" /> 量子密钥终端
-            </div>
-            <div class="legend-item">
-              <span class="legend-dot bus" /> 总线
-            </div>
-            <div class="legend-item">
-              <span class="legend-dot distributed" /> 储能柜
-            </div>
-            <div class="legend-line">
-              <span class="line-normal" /> 正常连接
-            </div>
-            <div class="legend-line">
-              <span class="line-transferring" /> 数据传输中
-            </div>
-            <div class="legend-line">
-              <span class="line-fault" /> 故障连接
+
+            <el-divider />
+
+            <!-- 节点筛选 -->
+            <div class="filter-section">
+              <h4 class="section-title">节点筛选</h4>
+
+              <el-form :model="filterForm" label-position="top" size="small">
+                <el-form-item label="设备类型">
+                  <el-select v-model="filterForm.deviceType" placeholder="全部类型" clearable @change="handleFilterChange">
+                    <el-option label="全部" value="" />
+                    <el-option label="安全网关" value="gateway" />
+                    <el-option label="交换机" value="switch" />
+                    <el-option label="服务器" value="server" />
+                    <el-option label="量子密钥终端" value="qkd" />
+                    <el-option label="总线" value="bus" />
+                    <el-option label="储能柜" value="distributed" />
+                  </el-select>
+                </el-form-item>
+
+                <el-form-item label="状态筛选">
+                  <el-select v-model="filterForm.status" placeholder="全部状态" clearable @change="handleFilterChange">
+                    <el-option label="全部" value="" />
+                    <el-option label="正常" value="normal" />
+                    <el-option label="数据传输中" value="transferring" />
+                    <el-option label="故障" value="fault" />
+                  </el-select>
+                </el-form-item>
+
+                <el-form-item label="搜索节点">
+                  <el-input v-model="filterForm.keyword" placeholder="输入节点名称" clearable @input="handleFilterChange" />
+                </el-form-item>
+
+                <el-form-item>
+                  <el-button type="primary" size="mini" class="reset-btn" @click="resetFilter">
+                    重置筛选
+                  </el-button>
+                </el-form-item>
+              </el-form>
             </div>
           </div>
-          
-          <el-divider />
-          
-          <!-- 节点筛选 -->
-          <div class="filter-section">
-            <h4 class="section-title">节点筛选</h4>
-            
-            <el-form :model="filterForm" label-position="top" size="small">
-              <el-form-item label="设备类型">
-                <el-select 
-                  v-model="filterForm.deviceType" 
-                  placeholder="全部类型" 
-                  clearable
-                  @change="handleFilterChange"
-                >
-                  <el-option label="全部" value="" />
-                  <el-option label="安全网关" value="gateway" />
-                  <el-option label="交换机" value="switch" />
-                  <el-option label="服务器" value="server" />
-                  <el-option label="量子密钥终端" value="qkd" />
-                  <el-option label="总线" value="bus" />
-                  <el-option label="储能柜" value="distributed" />
-                </el-select>
-              </el-form-item>
-              
-              <el-form-item label="状态筛选">
-                <el-select 
-                  v-model="filterForm.status" 
-                  placeholder="全部状态" 
-                  clearable
-                  @change="handleFilterChange"
-                >
-                  <el-option label="全部" value="" />
-                  <el-option label="正常" value="normal" />
-                  <el-option label="数据传输中" value="transferring" />
-                  <el-option label="故障" value="fault" />
-                </el-select>
-              </el-form-item>
-              
-              <el-form-item label="搜索节点">
-                <el-input 
-                  v-model="filterForm.keyword" 
-                  placeholder="输入节点名称" 
-                  clearable
-                  @input="handleFilterChange"
-                />
-              </el-form-item>
-              
-              <el-form-item>
-                <el-button 
-                  type="primary" 
-                  size="mini" 
-                  class="reset-btn"
-                  @click="resetFilter"
-                >
-                  重置筛选
-                </el-button>
-              </el-form-item>
-            </el-form>
-          </div>
-        </div>
-      </el-card>
-      
+        </el-card>
+      </el-col>
+
       <!-- 中间拓扑图区域 -->
-      <el-card class="chart-card">
-        <template #header>
-          <div class="card-header">
-            <div>
-              <h2>服务拓扑可视化</h2>
-              <p class="subtitle">展示设备连接关系，支持缩放、拖拽和节点查看</p>
+      <el-col :xs="24" :sm="16" :md="12" :lg="14" :xl="16">
+        <el-card class="chart-card">
+          <template #header>
+            <div class="card-header">
+              <div>
+                <h1>服务拓扑可视化</h1>
+                <p class="subtitle">展示设备连接关系，支持节点查看</p>
+              </div>
             </div>
-            <div class="chart-actions">
-              <el-button icon="el-icon-refresh-left" size="mini" @click="resetView">重置视图</el-button>
-              <el-button icon="el-icon-zoom-in" size="mini" @click="zoomIn">放大</el-button>
-              <el-button icon="el-icon-zoom-out" size="mini" @click="zoomOut">缩小</el-button>
-            </div>
-          </div>
-        </template>
-        
-        <!-- 拓扑图主体 -->
-        <div class="chart-container">
-          <div ref="chartRef" class="chart" />
-        </div>
-      </el-card>
-    </div>
+          </template>
 
-    <!-- 节点点详情弹窗 -->
-    <el-dialog 
-      v-model="detailVisible" 
-      :title="dialogTitle" 
-      width="500px"
-    >
-      <div v-if="selectedNode" class="node-detail-content">
-        <el-descriptions column="1" border class="detail-descriptions">
-          <el-descriptions-item label="节点ID">
-            {{ selectedNode.id }}
-          </el-descriptions-item>
-          <el-descriptions-item label="设备类型">
-            {{ formatDeviceType(selectedNode.deviceType) }}
-          </el-descriptions-item>
-          <el-descriptions-item label="状态">
-            <el-tag :type="getStatusTagType(selectedNode.status)" effect="dark">
-              {{ formatStatus(selectedNode.status) }}
+          <!-- 拓扑图主体 -->
+          <div class="chart-container">
+            <div ref="chartRef" class="chart" />
+          </div>
+        </el-card>
+      </el-col>
+
+      <!-- 右侧属性面板 -->
+      <el-col :xs="24" :sm="24" :md="6" :lg="5" :xl="4">
+        <el-card class="property-panel">
+          <div slot="header" class="panel-header">
+            <span>属性面板</span>
+          </div>
+
+          <div v-if="selectedEntity" class="property-content">
+            <h3 class="entity-name">{{ selectedEntity.name }}</h3>
+            <el-tag :type="getStatusTagType(selectedEntity.status)" effect="dark" size="mini">
+              {{ formatStatus(selectedEntity.status) }}
             </el-tag>
-          </el-descriptions-item>
-          <el-descriptions-item label="连接方式" v-if="selectedNode.connection">
-            {{ selectedNode.connection }}
-          </el-descriptions-item>
-          <el-descriptions-item label="最后更新时间">
-            {{ lastUpdateTime }}
-          </el-descriptions-item>
-          
-          <!-- 量子密钥信息（仅储能柜显示） -->
-          <el-descriptions-item 
-            label="实时量子密钥" 
-            v-if="selectedNode.deviceType === 'distributed' && showKeyInfo"
-          >
-            <span class="key-value">{{ realtimeKey }}</span>
-          </el-descriptions-item>
-        </el-descriptions>
 
-        <el-divider content-position="left" v-if="selectedNode.deviceType === 'distributed'">
-          运行指标
-        </el-divider>
+            <el-descriptions column="1" border class="property-descriptions">
+              <el-descriptions-item label="类型">
+                {{ selectedEntity.type === 'node' ? '设备节点' : '连接链路' }}
+              </el-descriptions-item>
 
-        <div v-if="selectedNode.deviceType === 'distributed'" class="metrics-container">
-          <div class="metric-item">
-            <span class="metric-label">运行负载</span>
-            <el-progress 
-              :percentage="nodeMetrics.load" 
-              :status="getNodeMetricStatus(nodeMetrics.load)"
-              stroke-width="6"
-            />
+              <!-- 节点特有属性 -->
+              <template v-if="selectedEntity.type === 'node'">
+                <el-descriptions-item label="节点ID">
+                  {{ selectedEntity.id }}
+                </el-descriptions-item>
+                <el-descriptions-item label="设备类型">
+                  {{ formatDeviceType(selectedEntity.deviceType) }}
+                </el-descriptions-item>
+                <el-descriptions-item label="连接方式" v-if="selectedEntity.connection">
+                  {{ selectedEntity.connection }}
+                </el-descriptions-item>
+                <el-descriptions-item label="最后更新时间">
+                  {{ lastUpdateTime }}
+                </el-descriptions-item>
+
+                <!-- 量子密钥信息（仅储能柜显示） -->
+                <el-descriptions-item label="实时量子密钥" v-if="selectedEntity.deviceType === 'distributed'">
+                  <span class="key-value">{{ realtimeKey }}</span>
+                </el-descriptions-item>
+              </template>
+
+              <!-- 链路特有属性 -->
+              <template v-if="selectedEntity.type === 'edge'">
+                <el-descriptions-item label="连接方向">
+                  {{ formatDeviceType(selectedEntity.sourceType) }} → {{ formatDeviceType(selectedEntity.targetType) }}
+                </el-descriptions-item>
+                <el-descriptions-item label="连接类型">
+                  {{ selectedEntity.name }}
+                </el-descriptions-item>
+                <el-descriptions-item label="两端节点">
+                  {{ selectedEntity.sourceName }} → {{ selectedEntity.targetName }}
+                </el-descriptions-item>
+              </template>
+            </el-descriptions>
+
+            
+
+            
           </div>
-          <div class="metric-item">
-            <span class="metric-label">通信质量</span>
-            <el-progress 
-              :percentage="nodeMetrics.signal" 
-              :status="getNodeMetricStatus(nodeMetrics.signal)"
-              stroke-width="6"
-            />
+
+          <div v-else class="property-placeholder">
+            <el-empty description="选择节点或连接查看详情" />
           </div>
-        </div>
-      </div>
-      
-      <!-- 连线详情 -->
-      <div v-if="selectedLink" class="link-detail-content">
-        <el-descriptions column="1" border class="detail-descriptions">
-          <el-descriptions-item label="连接方向">
-            {{ formatDeviceType(selectedLink.sourceType) }} → {{ formatDeviceType(selectedLink.targetType) }}
-          </el-descriptions-item>
-          <el-descriptions-item label="连接类型">
-            {{ selectedLink.name }}
-          </el-descriptions-item>
-          <el-descriptions-item label="数据传输状态">
-            <el-tag :type="getStatusTagType(selectedLink.status)" effect="dark">
-              {{ formatStatus(selectedLink.status) }}
-            </el-tag>
-          </el-descriptions-item>
-          <el-descriptions-item label="两端节点">
-            {{ selectedLink.sourceName }} → {{ selectedLink.targetName }}
-          </el-descriptions-item>
-        </el-descriptions>
-      </div>
-      
-      <div v-else-if="selectedNode && !selectedLink">
-        <el-empty description="未选择节点或连接" />
-      </div>
-    </el-dialog>
+        </el-card>
+      </el-col>
+    </el-row>
   </div>
 </template>
 
@@ -220,14 +179,8 @@ const chartRef = ref(null);
 let myChart = null;
 let zoomLevel = 1; // 缩放级别控制
 
-// 弹窗控制变量
-const detailVisible = ref(false);
-const dialogTitle = ref('详情');
-const showKeyInfo = ref(false);
-const selectedNode = ref(null);
-const selectedLink = ref(null);
-
-// 数据存储变量
+// 属性面板数据
+const selectedEntity = ref(null);
 const realtimeKey = ref('');
 const lastUpdateTime = ref('');
 
@@ -322,7 +275,7 @@ const getNodeMetricStatus = (value) => {
 
 // 更新节点指标数据
 const updateNodeMetrics = () => {
-  if (!selectedNode.value) return;
+  if (!selectedEntity.value || selectedEntity.value.type !== 'node') return;
 
   nodeMetrics.load = Math.floor(Math.random() * 30) + 50; // 50-80之间随机值
   nodeMetrics.signal = Math.floor(Math.random() * 40) + 60; // 60-100之间随机值
@@ -352,17 +305,17 @@ const filterNodesAndLinks = () => {
     if (filterForm.deviceType && node.deviceType !== filterForm.deviceType) {
       return false;
     }
-    
+
     // 状态筛选（仅储能柜有状态）
     if (filterForm.status && node.deviceType === 'distributed' && node.status !== filterForm.status) {
       return false;
     }
-    
+
     // 关键词筛选
     if (filterForm.keyword && !node.name.includes(filterForm.keyword)) {
       return false;
     }
-    
+
     return true;
   }).map(node => ({
     ...node,
@@ -370,10 +323,10 @@ const filterNodesAndLinks = () => {
     symbolSize: nodeTypeConfig[node.deviceType].size,
     symbol: nodeTypeConfig[node.deviceType].symbol || 'circle'
   }));
-  
+
   // 筛选链路（只保留两端节点都在筛选结果中的链路）
   const nodeIds = new Set(filteredNodes.value.map(node => node.id));
-  filteredLinks.value = originalLinks.value.filter(link => 
+  filteredLinks.value = originalLinks.value.filter(link =>
     nodeIds.has(link.source) && nodeIds.has(link.target)
   );
 };
@@ -543,12 +496,12 @@ onMounted(async () => {
   // 初始化图表
   const initChart = () => {
     if (!chartRef.value) return;
-    
+
     // 确保图表容器尺寸正确
     const container = chartRef.value;
     container.style.width = '100%';
     container.style.height = '100%';
-    
+
     // 初始化ECharts实例
     myChart = echarts.init(container);
 
@@ -559,8 +512,8 @@ onMounted(async () => {
         ...node,
         symbolSize: nodeTypeConfig[node.deviceType].size,
         symbol: nodeTypeConfig[node.deviceType].symbol || 'circle',
-        itemStyle: node.deviceType === 'distributed' 
-          ? node.status === 'fault' 
+        itemStyle: node.deviceType === 'distributed'
+          ? node.status === 'fault'
             ? { ...node.itemStyle, borderColor: '#ef4444', color: '#fecaca' }
             : node.status === 'transferring'
               ? { ...node.itemStyle, borderColor: '#3b82f6', color: '#dbeafe' }
@@ -676,30 +629,30 @@ onMounted(async () => {
     // 节点点击事件
     myChart.on('click', (params) => {
       if (params.dataType === 'node') {
-        selectedNode.value = { ...params.data };
-        selectedLink.value = null;
-        showKeyInfo.value = params.data.deviceType === 'distributed';
-        dialogTitle.value = `${params.data.name}详情`;
-        detailVisible.value = true;
+        // 节点点击 - 更新属性面板
+        selectedEntity.value = {
+          ...params.data,
+          type: 'node'
+        };
         updateNodeMetrics();
-        
+
         if (params.data.deviceType === 'distributed') {
           realtimeKey.value = Math.random().toString(36).substring(2, 10).toUpperCase();
         }
-      } 
-      // 连线点击事件 - 显示连线属性面板
+      }
+      // 链路点击事件
       else if (params.dataType === 'edge') {
-        selectedLink.value = {
+        // 链路点击 - 更新属性面板
+        selectedEntity.value = {
           ...params.data,
+          type: 'edge',
+          name: `${params.data.source} → ${params.data.target}`,
           // 获取源节点和目标节点的类型和名称
           sourceType: originalNodes.value.find(n => n.id === params.data.source)?.deviceType,
           targetType: originalNodes.value.find(n => n.id === params.data.target)?.deviceType,
           sourceName: originalNodes.value.find(n => n.id === params.data.source)?.name,
           targetName: originalNodes.value.find(n => n.id === params.data.target)?.name
         };
-        selectedNode.value = null;
-        dialogTitle.value = '连接详情';
-        detailVisible.value = true;
       }
     });
 
@@ -711,7 +664,7 @@ onMounted(async () => {
     };
 
     window.addEventListener('resize', handleResize);
-    
+
     // 组件卸载时清理事件
     onUnmounted(() => {
       window.removeEventListener('resize', handleResize);
@@ -838,8 +791,6 @@ onUnmounted(() => {
 }
 
 .main-content {
-  display: flex;
-  gap: 20px;
   flex: 1;
   height: calc(100% - 40px);
   overflow: hidden;
@@ -847,21 +798,26 @@ onUnmounted(() => {
 
 /* 左侧筛选面板 */
 .filter-panel {
-  width: 260px;
-  flex-shrink: 0;
+  height: 100%;
   display: flex;
   flex-direction: column;
-  max-height: 100%;
   overflow: hidden;
 }
 
 /* 中间图表区域 */
 .chart-card {
-  flex: 1;
+  height: 100%;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+/* 右侧属性面板 */
+.property-panel {
   height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .card-header {
@@ -904,7 +860,8 @@ onUnmounted(() => {
   gap: 10px;
 }
 
-.legend-item, .legend-line {
+.legend-item,
+.legend-line {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -919,41 +876,119 @@ onUnmounted(() => {
   display: inline-block;
 }
 
-.line-normal, .line-transferring, .line-fault {
+.line-normal,
+.line-transferring,
+.line-fault {
   height: 2px;
   width: 24px;
   display: inline-block;
 }
 
 /* 图例颜色定义 */
-.gateway { background-color: #4895ef; }
-.switch { background-color: #64748b; }
-.server { background-color: #94a3b8; }
-.qkd { background-color: #f59e0b; }
-.bus { background-color: #e2e8f0; }
-.distributed { background-color: #d1fae5; }
-.line-normal { background-color: #10b981; }
-.line-transferring { background-color: #3b82f6; }
-.line-fault { background-color: #ef4444; }
+.gateway {
+  background-color: #4895ef;
+}
 
-/* 弹窗样式 */
-.node-detail-content, .link-detail-content {
+.switch {
+  background-color: #64748b;
+}
+
+.server {
+  background-color: #94a3b8;
+}
+
+.qkd {
+  background-color: #f59e0b;
+}
+
+.bus {
+  background-color: #e2e8f0;
+}
+
+.distributed {
+  background-color: #d1fae5;
+}
+
+.line-normal {
+  background-color: #10b981;
+}
+
+.line-transferring {
+  background-color: #3b82f6;
+}
+
+.line-fault {
+  background-color: #ef4444;
+}
+
+/* 属性面板样式 */
+.property-content {
+  padding: 10px 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: calc(100% - 50px);
+  overflow-y: auto;
+}
+
+.entity-name {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.property-descriptions {
+  font-size: 13px;
+  margin-bottom: 10px;
+}
+
+.property-placeholder {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.key-value {
+  font-family: monospace;
+  background: #f5f5f5;
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+.metrics-container {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
   padding: 10px 0;
 }
 
-.detail-descriptions {
-  margin-bottom: 15px;
+.metric-item {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
 }
 
-/* 响应式调整 */
-@media (max-width: 1024px) {
-  .main-content {
-    flex-direction: column;
+.metric-label {
+  font-size: 13px;
+  color: #606266;
+}
+
+/* 响应式布局调整 */
+@media (max-width: 768px) {
+  .topology-container {
+    padding: 10px;
   }
-  
-  .filter-panel {
-    width: 100%;
-    max-height: 300px;
+
+  .main-content {
+    height: calc(100% - 20px);
+  }
+
+  .chart-container {
+    padding: 10px;
   }
 }
 </style>
+/* 确保在移动设备上图表能够自适应 */
