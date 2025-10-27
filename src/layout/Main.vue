@@ -138,7 +138,7 @@ const toolbar = ref({
 })
 
 // 提取储能柜节点便于单独处理布局
-const storageCabinets = Array.from({ length: 12 }, (_, i) => ({
+const storageCabinets = Array.from({ length: 13 }, (_, i) => ({
   id: `storageCabinet${i + 1}`,
   name: `储能柜${i + 1}`,
   status: getRandomStatus(),
