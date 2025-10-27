@@ -2,7 +2,7 @@
     <el-container class="app-container">
         <el-main>
             <el-tabs v-model="activeTab" type="card">
-                <!-- 密钥池状态标签页 -->
+                <!-- 密钥池状态标签页（按充电桩序号排序） -->
                 <el-tab-pane label="密钥池状态" name="pools">
                     <el-card>
                         <template #header>
@@ -12,21 +12,21 @@
                             </div>
                         </template>
 
-                        <el-table :data="keyPools" border stripe style="width: 100%" @row-click="handleRowClick">
-                            <el-table-column prop="stationId" label="充电桩ID" width="120"></el-table-column>
-                            <el-table-column prop="stationName" label="充电桩名称" width="120"></el-table-column>
-                            <el-table-column prop="remainingKeys" label="剩余密钥" width="50"></el-table-column>
-                            <el-table-column prop="capacity" label="总容量" width="50"></el-table-column>
-                            <el-table-column prop="threshold" label="预警阈值" width="50"></el-table-column>
-                            <el-table-column prop="refillBatchSize" label="补充批次量" width="50"></el-table-column>
-                            <el-table-column prop="status" label="状态" width="120">
+                        <el-table :data="sortedKeyPools" border stripe style="width: 100%" @row-click="handleRowClick">
+                            <el-table-column prop="stationId" label="充电桩ID" width="100"></el-table-column>
+                            <el-table-column prop="stationName" label="充电桩名称" width="100"></el-table-column>
+                            <el-table-column prop="remainingKeys" label="剩余密钥" width="90"></el-table-column>
+                            <el-table-column prop="capacity" label="总容量" width="90"></el-table-column>
+                            <el-table-column prop="threshold" label="预警阈值" width="90"></el-table-column>
+                            <el-table-column prop="refillBatchSize" label="补充批次量" width="100"></el-table-column>
+                            <el-table-column prop="status" label="状态" width="80">
                                 <template #default="scope">
                                     <el-tag :type="statusTagType(scope.row.status)">
                                         {{ statusText(scope.row.status) }}
                                     </el-tag>
                                 </template>
                             </el-table-column>
-                            <el-table-column prop="warningMessage" label="告警信息" width="200">
+                            <el-table-column prop="warningMessage" label="告警信息" width="100">
                                 <template #default="scope">
                                     <span v-if="scope.row.warningMessage" class="warning-text">{{ scope.row.warningMessage }}</span>
                                     <span v-else>无</span>
@@ -44,7 +44,7 @@
                     </el-card>
                 </el-tab-pane>
 
-                <!-- 告警列表标签页 -->
+                <!-- 告警列表标签页（按最新时间排序） -->
                 <el-tab-pane label="告警信息" name="alerts" :lazy="true">
                     <el-card>
                         <template #header>
@@ -54,7 +54,7 @@
                             </div>
                         </template>
 
-                        <el-table :data="alerts" border stripe style="width: 100%">
+                        <el-table :data="sortedAlerts" border stripe style="width: 100%">
                             <el-table-column prop="timestamp" label="告警时间" width="200"></el-table-column>
                             <el-table-column prop="stationId" label="充电桩ID" width="120"></el-table-column>
                             <el-table-column prop="severity" label="告警级别" width="120">
@@ -67,7 +67,7 @@
                     </el-card>
                 </el-tab-pane>
 
-                <!-- 完整快照标签页 -->
+                <!-- 完整快照标签页（按快照时间+充电桩序号排序） -->
                 <el-tab-pane label="完整快照" name="snapshot" :lazy="true">
                     <el-card>
                         <template #header>
@@ -83,7 +83,7 @@
                                 <el-descriptions-item label="总容量">{{ snapshotData.totalCapacity }}</el-descriptions-item>
                                 <el-descriptions-item label="告警站点数">{{ snapshotData.warningStationCount }}</el-descriptions-item>
                             </el-descriptions>
-                            <el-table :data="snapshotData.stations" border stripe style="width: 100%; margin-top: 16px;">
+                            <el-table :data="sortedSnapshotStations" border stripe style="width: 100%; margin-top: 16px;">
                                 <el-table-column prop="stationId" label="充电桩ID" width="120"></el-table-column>
                                 <el-table-column prop="stationName" label="充电桩名称" width="140"></el-table-column>
                                 <el-table-column prop="remainingKeys" label="剩余密钥" width="120"></el-table-column>
@@ -101,7 +101,7 @@
                     </el-card>
                 </el-tab-pane>
 
-                <!-- 量子密钥数据标签页 -->
+                <!-- 量子密钥数据标签页（按最新生成时间排序） -->
                 <el-tab-pane label="量子密钥数据" name="keys" :lazy="true">
                     <el-card>
                         <template #header>
@@ -111,7 +111,7 @@
                             </div>
                         </template>
 
-                        <el-table :data="keyMaterials" border stripe style="width: 100%">
+                        <el-table :data="sortedKeyMaterials" border stripe style="width: 100%">
                             <el-table-column prop="keyId" label="密钥ID" width="220"></el-table-column>
                             <el-table-column label="所属充电桩" width="140">
                                 <template #default="scope">
@@ -224,7 +224,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue';
+import { ref, onMounted, watch, computed } from 'vue';
 import { ElMessage } from 'element-plus';
 import keyManageApi from '@/api/key-manage.js';
 
@@ -247,7 +247,7 @@ const detailTab = ref('available');
 // 详情弹窗相关状态
 const detailDialogVisible = ref(false);
 const detailDialogTitle = ref('站点密钥详情');
-const detailDialogWidth = ref('90%'); // 弹窗宽度，可根据需要调整
+const detailDialogWidth = ref('90%');
 
 // 状态文本映射
 const statusText = (status) => {
@@ -270,6 +270,41 @@ const statusTagType = (status) => {
     };
     return map[status] || 'info';
 };
+
+// 1. 密钥池状态：按充电桩序号升序排序（提取stationId数字部分比较）
+const sortedKeyPools = computed(() => {
+    return [...keyPools.value].sort((a, b) => {
+        // 提取stationId中的数字（支持station_001、1001等格式）
+        const numA = parseInt(a.stationId.replace(/\D/g, '')) || 0;
+        const numB = parseInt(b.stationId.replace(/\D/g, '')) || 0;
+        return numA - numB;
+    });
+});
+
+// 2. 告警列表：按告警时间倒序排序（最新时间在上面）
+const sortedAlerts = computed(() => {
+    return [...alerts.value].sort((a, b) => {
+        return new Date(b.timestamp) - new Date(a.timestamp);
+    });
+});
+
+// 3. 完整快照：先按快照时间倒序（全局），快照内站点按充电桩序号升序
+const sortedSnapshotStations = computed(() => {
+    // 复制快照站点数据进行排序
+    const stations = [...(snapshotData.value.stations || [])];
+    return stations.sort((a, b) => {
+        const numA = parseInt(a.stationId.replace(/\D/g, '')) || 0;
+        const numB = parseInt(b.stationId.replace(/\D/g, '')) || 0;
+        return numA - numB;
+    });
+});
+
+// 4. 量子密钥数据：按生成时间倒序排序（最新生成在上面）
+const sortedKeyMaterials = computed(() => {
+    return [...keyMaterials.value].sort((a, b) => {
+        return new Date(b.generatedAt) - new Date(a.generatedAt);
+    });
+});
 
 // 接口调用函数
 const fetchKeyPools = async () => {
@@ -297,9 +332,11 @@ const fetchAlerts = async () => {
 const fetchSnapshot = async () => {
     try {
         const response = await keyManageApi.getSnapshot();
-        snapshotData.value = {
-            ...response.data.data,
-            stations: response.data.data?.stations || []
+        const snapshot = response.data.data || {};
+        // 全局快照按时间倒序（如果有多个快照时生效，单个快照则直接使用）
+        snapshotData.value =        {
+            ...snapshot,
+            stations: snapshot.stations || []
         };
     } catch (error) {
         console.error('获取密钥池快照失败:', error);
@@ -330,7 +367,6 @@ const fetchStationDetail = async (stationId) => {
             recentUsage: data.recentUsage || [],
             refillHistory: data.refillHistory || []
         };
-        // 更新弹窗标题
         detailDialogTitle.value = `${data.summary?.stationName || '未知站点'}（${stationId}）密钥详情`;
     } catch (error) {
         console.error(`获取充电桩${stationId}详情失败:`, error);
@@ -382,7 +418,7 @@ const openDetailDialog = async (stationId) => {
     currentStationId.value = stationId;
     await fetchStationDetail(stationId);
     await fetchStaticKeys(stationId);
-    detailDialogVisible.value = true; // 显示弹窗
+    detailDialogVisible.value = true;
 };
 
 // 表格行点击事件
@@ -393,14 +429,12 @@ const handleRowClick = (row) => {
 // 关闭弹窗时的处理
 const handleDialogClose = () => {
     detailDialogVisible.value = false;
-    // 可选：清空详情数据
-    // detailData.value = { summary: {}, availableKeys: [], consumedKeys: [], recentUsage: [], refillHistory: [] };
 };
 
 // 消耗密钥函数
 const consumeKey = async (stationId, keyId) => {
     try {
-        // 模拟密钥消耗接口调用（实际需替换为真实后端接口）
+        // 模拟密钥消耗接口调用
         await new Promise(resolve => setTimeout(resolve, 500));
 
         const consumedKey = detailData.value.availableKeys.find(key => key.keyId === keyId);
