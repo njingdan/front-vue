@@ -26,9 +26,9 @@ const router = createRouter({
         },
         {
           path: "encrypt",
-          component: () => import("@/views/DataPacketEncryption.vue"),
+          component: () => import("@/views/CommunicationPage.vue"),
         },
-        { path: "auth", component: () => import("@/views/DeviceAuthentication.vue") },
+        { path: "auth", component: () => import("@/views/AuthenticationRecord.vue") },
         { path: "log", component: () => import("@/views/LogManagement.vue") },
       ],
     },

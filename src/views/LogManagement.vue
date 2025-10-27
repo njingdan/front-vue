@@ -63,6 +63,8 @@ import LogManagement from '@/components/LogManagement.vue'
 
 const logs = ref([])
 const keyword = ref('')
+
+// 分页变量
 const currentPage = ref(1)
 const pageSize = ref(10)
 const total = ref(0)
