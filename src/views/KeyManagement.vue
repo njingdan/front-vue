@@ -12,7 +12,21 @@
                             </div>
                         </template>
 
-                        <el-table :data="sortedKeyPools" border stripe style="width: 100%" @row-click="handleRowClick">
+                        <!-- 新增：筛选区域 -->
+                        <div class="filter-container">
+                            <el-input v-model="filterKeyword" placeholder="请输入充电桩ID或名称" clearable size="small"
+                                style="width: 240px; margin-right: 16px;"></el-input>
+
+                            <el-select v-model="filterStatus" placeholder="请选择状态" clearable size="small"
+                                style="width: 180px;">
+                                <el-option label="正常" value="NORMAL"></el-option>
+                                <el-option label="预警" value="WARNING"></el-option>
+                                <el-option label="耗尽" value="DEPLETED"></el-option>
+                                <el-option label="补充中" value="REFILLING"></el-option>
+                            </el-select>
+                        </div>
+
+                        <el-table :data="filteredKeyPools" border stripe style="width: 100%" @row-click="handleRowClick">
                             <el-table-column prop="stationId" label="充电桩ID" width="100"></el-table-column>
                             <el-table-column prop="stationName" label="充电桩名称" width="100"></el-table-column>
                             <el-table-column prop="remainingKeys" label="剩余密钥" width="90"></el-table-column>
@@ -28,14 +42,16 @@
                             </el-table-column>
                             <el-table-column prop="warningMessage" label="告警信息" width="100">
                                 <template #default="scope">
-                                    <span v-if="scope.row.warningMessage" class="warning-text">{{ scope.row.warningMessage }}</span>
+                                    <span v-if="scope.row.warningMessage" class="warning-text">{{
+                                        scope.row.warningMessage }}</span>
                                     <span v-else>无</span>
                                 </template>
                             </el-table-column>
                             <el-table-column prop="lastUpdated" label="最后更新时间" width="200"></el-table-column>
                             <el-table-column label="操作" width="180">
                                 <template #default="scope">
-                                    <el-button size="small" type="primary" @click="openDetailDialog(scope.row.stationId)">
+                                    <el-button size="small" type="primary"
+                                        @click="openDetailDialog(scope.row.stationId)">
                                         查看详情
                                     </el-button>
                                 </template>
@@ -79,11 +95,15 @@
                         <div v-if="snapshotData.totalRemaining !== undefined" class="snapshot-summary">
                             <el-descriptions title="快照概览" border :column="4">
                                 <el-descriptions-item label="快照时间">{{ snapshotData.generatedAt }}</el-descriptions-item>
-                                <el-descriptions-item label="总剩余密钥">{{ snapshotData.totalRemaining }}</el-descriptions-item>
-                                <el-descriptions-item label="总容量">{{ snapshotData.totalCapacity }}</el-descriptions-item>
-                                <el-descriptions-item label="告警站点数">{{ snapshotData.warningStationCount }}</el-descriptions-item>
+                                <el-descriptions-item label="总剩余密钥">{{ snapshotData.totalRemaining
+                                    }}</el-descriptions-item>
+                                <el-descriptions-item label="总容量">{{ snapshotData.totalCapacity
+                                    }}</el-descriptions-item>
+                                <el-descriptions-item label="告警站点数">{{ snapshotData.warningStationCount
+                                    }}</el-descriptions-item>
                             </el-descriptions>
-                            <el-table :data="sortedSnapshotStations" border stripe style="width: 100%; margin-top: 16px;">
+                            <el-table :data="sortedSnapshotStations" border stripe
+                                style="width: 100%; margin-top: 16px;">
                                 <el-table-column prop="stationId" label="充电桩ID" width="120"></el-table-column>
                                 <el-table-column prop="stationName" label="充电桩名称" width="140"></el-table-column>
                                 <el-table-column prop="remainingKeys" label="剩余密钥" width="120"></el-table-column>
@@ -141,12 +161,8 @@
         </el-main>
 
         <!-- 站点密钥详情弹窗 -->
-        <el-dialog 
-            v-model="detailDialogVisible" 
-            :title="detailDialogTitle" 
-            :width="detailDialogWidth"
-            :before-close="handleDialogClose"
-        >
+        <el-dialog v-model="detailDialogVisible" :title="detailDialogTitle" :width="detailDialogWidth"
+            :before-close="handleDialogClose">
             <el-card class="detail-card">
                 <el-descriptions title="站点基本信息" border :column="4" style="margin-bottom: 16px;">
                     <el-descriptions-item label="充电桩ID">{{ detailData.summary.stationId }}</el-descriptions-item>
@@ -172,7 +188,8 @@
                             <el-table-column prop="generatedAt" label="生成时间" width="200"></el-table-column>
                             <el-table-column label="操作" width="120">
                                 <template #default="scope">
-                                    <el-button size="small" type="danger" @click="consumeKey(detailData.summary.stationId, scope.row.keyId)">
+                                    <el-button size="small" type="danger"
+                                        @click="consumeKey(detailData.summary.stationId, scope.row.keyId)">
                                         消耗密钥
                                     </el-button>
                                 </template>
@@ -244,6 +261,10 @@ const detailData = ref({
 });
 const detailTab = ref('available');
 
+// 新增：筛选相关状态
+const filterKeyword = ref(''); // 用于筛选充电桩ID/名称的关键词
+const filterStatus = ref(''); // 用于筛选状态的选中值
+
 // 详情弹窗相关状态
 const detailDialogVisible = ref(false);
 const detailDialogTitle = ref('站点密钥详情');
@@ -278,6 +299,25 @@ const sortedKeyPools = computed(() => {
         const numA = parseInt(a.stationId.replace(/\D/g, '')) || 0;
         const numB = parseInt(b.stationId.replace(/\D/g, '')) || 0;
         return numA - numB;
+    });
+});
+
+// 新增：筛选后的密钥池数据（先排序后筛选）
+const filteredKeyPools = computed(() => {
+    return sortedKeyPools.value.filter(item => {
+        // 1. 关键词筛选（匹配充电桩ID或名称）
+        const keywordMatch = filterKeyword.value
+            ? item.stationId.includes(filterKeyword.value) ||
+            (item.stationName && item.stationName.includes(filterKeyword.value))
+            : true;
+
+        // 2. 状态筛选（匹配选中的状态）
+        const statusMatch = filterStatus.value
+            ? item.status === filterStatus.value
+            : true;
+
+        // 同时满足两个条件
+        return keywordMatch && statusMatch;
     });
 });
 
@@ -334,7 +374,7 @@ const fetchSnapshot = async () => {
         const response = await keyManageApi.getSnapshot();
         const snapshot = response.data.data || {};
         // 全局快照按时间倒序（如果有多个快照时生效，单个快照则直接使用）
-        snapshotData.value =        {
+        snapshotData.value = {
             ...snapshot,
             stations: snapshot.stations || []
         };
@@ -499,6 +539,13 @@ watch(activeTab, (newVal) => {
 </script>
 
 <style scoped>
+/* 新增：筛选区域样式 */
+.filter-container {
+    margin-bottom: 16px; /* 与表格保持距离 */
+    display: flex; /* 横向排列控件 */
+    align-items: center; /* 垂直居中 */
+}
+
 .app-container {
     height: 100vh;
     display: flex;
