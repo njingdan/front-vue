@@ -7,14 +7,14 @@
                     <el-card>
                         <template #header>
                             <div class="card-header">
-                                <span>所有充电桩密钥池状态</span>
+                                <span>所有储能柜密钥池状态</span>
                                 <el-button size="small" @click="refreshPools">刷新</el-button>
                             </div>
                         </template>
 
                         <!-- 新增：筛选区域 -->
                         <div class="filter-container">
-                            <el-input v-model="filterKeyword" placeholder="请输入充电桩ID或名称" clearable size="small"
+                            <el-input v-model="filterKeyword" placeholder="请输入储能柜ID或名称" clearable size="small"
                                 style="width: 240px; margin-right: 16px;"></el-input>
 
                             <el-select v-model="filterStatus" placeholder="请选择状态" clearable size="small"
@@ -27,8 +27,8 @@
                         </div>
 
                         <el-table :data="filteredKeyPools" border stripe style="width: 100%" @row-click="handleRowClick">
-                            <el-table-column prop="stationId" label="充电桩ID" width="100"></el-table-column>
-                            <el-table-column prop="stationName" label="充电桩名称" width="100"></el-table-column>
+                            <el-table-column prop="stationId" label="储能柜ID" width="100"></el-table-column>
+                            <el-table-column prop="stationName" label="储能柜名称" width="100"></el-table-column>
                             <el-table-column prop="remainingKeys" label="剩余密钥" width="90"></el-table-column>
                             <el-table-column prop="capacity" label="总容量" width="90"></el-table-column>
                             <el-table-column prop="threshold" label="预警阈值" width="90"></el-table-column>
@@ -122,7 +122,7 @@
                 </el-tab-pane>
 
                 <!-- 量子密钥数据标签页（按最新生成时间排序） -->
-                <el-tab-pane label="量子密钥数据" name="keys" :lazy="true">
+                <!-- <el-tab-pane label="量子密钥数据" name="keys" :lazy="true">
                     <el-card>
                         <template #header>
                             <div class="card-header">
@@ -156,7 +156,7 @@
                             </el-table-column>
                         </el-table>
                     </el-card>
-                </el-tab-pane>
+                </el-tab-pane> -->
             </el-tabs>
         </el-main>
 

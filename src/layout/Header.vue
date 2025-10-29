@@ -1,6 +1,6 @@
 <script setup>
 
-import { House, ArrowLeftBold, ArrowRightBold } from '@element-plus/icons-vue'
+import { House, ArrowLeftBold, ArrowRightBold, Expand,Fold } from '@element-plus/icons-vue'
 import { useSidebarStore } from '@/store/sidebarStore'
 import { useRoute } from 'vue-router'
 
@@ -17,8 +17,8 @@ const route = useRoute()
             <!-- <el-icon><ArrowRightBold /></el-icon> -->
             <el-icon>
                 <!-- 当侧边栏折叠时显示向右箭头，展开时显示向左箭头 -->
-                <ArrowRightBold v-if="sidebarStore.sidebarStatus === 'collapsed'" />
-                <ArrowLeftBold v-else />
+                <Expand v-if="sidebarStore.sidebarStatus === 'collapsed'" />
+                <Fold v-else />
             </el-icon>
             <!-- 获取当前路由的name -->
             <!-- 显示当前路由名称（若路由配置了name） -->
