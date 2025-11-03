@@ -1,7 +1,6 @@
 // 引入axios
 import axios from 'axios';
 
-
 let baseUrl="http://localhost:8000/";
 // 创建axios实例
 const httpService = axios.create({

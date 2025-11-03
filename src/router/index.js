@@ -15,7 +15,7 @@ const router = createRouter({
         {
           path: "collect",
           name: "信号采集",
-          component: () => import("@/views/WaveformViewer.vue"),
+          component: () => import("@/views/SignalMonitor.vue"),
         },
         {
           path: "key-manage",
