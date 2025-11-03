@@ -42,5 +42,9 @@ const sidebarStore = useSidebarStore();
   background-color: #f5f5f5;
 }
 
+.el-aside {
+  background-color: #fff;
+}
+
 
 </style>

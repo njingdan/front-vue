@@ -5,7 +5,15 @@ import {
     Location,
     Setting,
     Operation,
-    Open
+    Open,
+    DataLine,
+    Key,
+    Notebook,
+    Tools,
+    Message,
+    Promotion,
+    HomeFilled,
+    OfficeBuilding
 } from '@element-plus/icons-vue'
 
 import { ref,computed } from 'vue'
@@ -43,31 +51,37 @@ const handleClose = (key, keyPath) => {
                     <span>主面板</span>
                 </el-menu-item>
 
+                <el-menu-item index="/module/auth">
+                    <el-icon><OfficeBuilding /></el-icon>
+                    <span>设备认证</span>
+                </el-menu-item>
+
+                <el-menu-item index="/module/key-distribute">
+                    <el-icon><Promotion /></el-icon>
+                    <span>秘钥分发</span>
+                </el-menu-item>
+
                 <el-sub-menu index="/module">
                     <template #title>
-                        <el-icon>
-                            <Operation />
-                        </el-icon>
-                        <span>功能模块</span>
+                       <el-icon><Tools /></el-icon>
+                        <span>管理模块</span>
                     </template>
 
                     <!-- 子菜单 -->
-                    <el-menu-item index="/module/collect">信号采集</el-menu-item>
-                    <el-menu-item index="/module/key-manage">秘钥管理</el-menu-item>
-                    <el-menu-item index="/module/key-distribute">秘钥分发</el-menu-item>
-                    <el-menu-item index="/module/encrypt">数据包加密</el-menu-item>
-                    <el-menu-item index="/module/auth">设备认证</el-menu-item>
-                    <el-menu-item index="/module/log">日志管理</el-menu-item>
-                    <el-menu-item index="/module/test">测试</el-menu-item>
+                    <el-menu-item index="/module/collect"><el-icon><DataLine /></el-icon>信号采集</el-menu-item>
+                    <el-menu-item index="/module/key-manage"><el-icon><Key /></el-icon>秘钥管理</el-menu-item>
+                    <el-menu-item index="/module/encrypt"><el-icon><Message /></el-icon>数据包加密</el-menu-item>
+                    <el-menu-item index="/module/log"><el-icon><Notebook /></el-icon>日志管理</el-menu-item>
+                    <!-- <el-menu-item index="/module/test">测试</el-menu-item> -->
                 </el-sub-menu>
 
 
-                <el-menu-item index="3">
+                <!-- <el-menu-item index="3">
                     <el-icon>
                         <setting />
                     </el-icon>
                     <span>其他</span>
-                </el-menu-item>
+                </el-menu-item> -->
             </el-menu>
 
         </el-col>
@@ -78,6 +92,18 @@ const handleClose = (key, keyPath) => {
 
 <style scoped>
 
+.el-menu{
+    background-color: #fff;
+}
+
+.el-sub-menu{
+    background-color: #fff;
+}
+
+.el-menu-item {
+    background-color: #fff;
+}
+
 /* 容器占满左侧高度 */
 .sidebar-container {
   height: 100vh; /* 占满视口高度 */
@@ -87,7 +113,7 @@ const handleClose = (key, keyPath) => {
 
 .sidebar-col {
   height: 100%; /* 继承父容器高度 */
-  background-color: #f5f5f5; /* 可选：统一背景色 */
+  background-color: blue; /* 可选：统一背景色 */
 }
 
 /* 菜单样式调整 */
