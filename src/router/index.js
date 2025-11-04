@@ -18,9 +18,12 @@ const router = createRouter({
           component: () => import("@/views/WaveformViewer.vue"),
         },
         {
-          path: "key-manage",
+          path: "key-manage", //带参数的路由，用于传递storage ID
           name: "秘钥管理",
           component: () => import("@/views/KeyManagement.vue"),
+          meta: {
+            stationId: "", // 用于临时传递参数（实际通过状态管理获取）
+          },
         },
         {
           path: "key-distribute",
@@ -31,7 +34,10 @@ const router = createRouter({
           path: "encrypt",
           component: () => import("@/views/CommunicationPage.vue"),
         },
-        { path: "auth", component: () => import("@/views/AuthenticationRecord.vue") },
+        {
+          path: "auth",
+          component: () => import("@/views/AuthenticationRecord.vue"),
+        },
         { path: "log", component: () => import("@/views/LogManagement.vue") },
       ],
     },
