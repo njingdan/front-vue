@@ -6,7 +6,7 @@ import { get } from '@/axios/request.js';
  */
 const keyManageApi = {
   /**
-   * 获取所有充电桩密钥池状态
+   * 获取所有充电桩状态
    * @returns {Promise}
    */
   getKeyPools: () => {
@@ -47,12 +47,21 @@ const keyManageApi = {
   },
 
   /**
-   * 获取指定充电桩的静态密钥数据
-   * @param {string} stationId - 充电桩ID
+   * 获取指定充电桩的可用密钥数据
+   * @param {string} stationName - 充电桩Name
    * @returns {Promise}
    */
-  getStaticKeys: (stationId) => {
-    return get(`/api/key-management/pools/${stationId}/keys/static`);
+  getUsableKeys: (stationName) => {
+    return get(`/api/key-management/pools/usable_keys/${stationName}`);
+  },
+
+    /**
+   * 获取指定充电桩的不可用密钥数据
+   * @param {string} stationName - 充电桩Name
+   * @returns {Promise}
+   */
+  getUnusableKeys: (stationName) => {
+    return get(`/api/key-management/pools/unusable_keys/${stationName}`);
   }
 };
 

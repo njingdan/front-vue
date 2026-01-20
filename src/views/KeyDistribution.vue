@@ -49,7 +49,7 @@
 
                     <div class="channel-metrics">
                         <div class="metric-item">
-                            <div class="metric-label">光功率</div>
+                            <div class="metric-label">RSSI</div>
                             <div class="metric-value">{{ channelStatus.metrics?.opticalPower || 'N/A' }} dBm</div>
                             <div class="metric-trend" :class="getTrendClass('opticalPower')">
                                 <el-icon :size="16">
@@ -86,8 +86,8 @@
                         </div>
 
                         <div class="metric-item">
-                            <div class="metric-label">信道温度</div>
-                            <div class="metric-value">{{ channelStatus.metrics?.temperature || 'N/A' }} °C</div>
+                            <div class="metric-label">CSI</div>
+                            <div class="metric-value">{{ channelStatus.metrics?.temperature || 'N/A' }} </div>
                             <div class="metric-trend" :class="getTrendClass('temperature')">
                                 <el-icon :size="16">
                                     <ArrowUp v-if="channelTrends.temperature === 'up'" />
@@ -224,10 +224,10 @@ const channelTrends = reactive({
 
 // 密钥分发阶段定义
 const stages = [
-    { name: '量子态传输', threshold: 25 },
-    { name: '基矢协商', threshold: 50 },
-    { name: '误码率测试', threshold: 75 },
-    { name: '密钥提纯', threshold: 100 }
+    { name: '信道探测', threshold: 25 },
+    { name: '密钥生成', threshold: 50 },
+    { name: '密钥分发', threshold: 75 },
+    { name: '密钥提取', threshold: 100 }
 ];
 
 // 页面加载时获取数据
@@ -366,10 +366,10 @@ const getCurrentStage = () => {
     const progress = progressData.value.progress || 0;
 
     if (progress >= 100) return '已完成';
-    if (progress >= 75) return '密钥提纯';
-    if (progress >= 50) return '误码率测试';
-    if (progress >= 25) return '基矢协商';
-    if (progress > 0) return '量子态传输';
+    if (progress >= 75) return '密钥提取';
+    if (progress >= 50) return '密钥分发';
+    if (progress >= 25) return '密钥生成';
+    if (progress > 0) return '信道探测';
     return '未开始';
 };
 

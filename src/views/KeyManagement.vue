@@ -26,59 +26,29 @@
                             </el-select>
                         </div>
 
-                        <el-table :data="filteredKeyPools" border stripe style="width: 100%" @row-click="handleRowClick">
-                            <el-table-column prop="stationId" label="储能柜ID" width="100"></el-table-column>
-                            <el-table-column prop="stationName" label="储能柜名称" width="100"></el-table-column>
-                            <el-table-column prop="remainingKeys" label="剩余密钥" width="90"></el-table-column>
-                            <el-table-column prop="capacity" label="总容量" width="90"></el-table-column>
-                            <el-table-column prop="threshold" label="预警阈值" width="90"></el-table-column>
-                            <el-table-column prop="refillBatchSize" label="补充批次量" width="100"></el-table-column>
-                            <el-table-column prop="status" label="状态" width="80">
+                        <el-table :data="filteredKeyPools" border stripe style="width: 100%">
+                            <el-table-column prop="stationId" label="储能柜ID" ></el-table-column>
+                            <el-table-column prop="stationName" label="储能柜名称" ></el-table-column>
+                            <el-table-column prop="remainingKeys" label="剩余密钥" ></el-table-column>
+                            <el-table-column prop="capacity" label="总容量"></el-table-column>
+                            <el-table-column prop="threshold" label="预警阈值" ></el-table-column>
+                            <el-table-column prop="refillBatchSize" label="补充批次量" ></el-table-column>
+                            <el-table-column prop="status" label="状态" >
                                 <template #default="scope">
-                                    <el-tag :type="statusTagType(scope.row.status)">
-                                        {{ statusText(scope.row.status) }}
+                                    <el-tag :type="scope.row.status === 1 || scope.row.status === '正常' ? 'success' : 'danger'">
+                                        {{ scope.row.status === 1 || scope.row.status === '正常' ? '正常' : '异常' }}
                                     </el-tag>
-                                </template>
-                            </el-table-column>
-                            <el-table-column prop="warningMessage" label="告警信息" width="100">
-                                <template #default="scope">
-                                    <span v-if="scope.row.warningMessage" class="warning-text">{{
-                                        scope.row.warningMessage }}</span>
-                                    <span v-else>无</span>
                                 </template>
                             </el-table-column>
                             <el-table-column prop="lastUpdated" label="最后更新时间" width="200"></el-table-column>
                             <el-table-column label="操作" width="180">
                                 <template #default="scope">
                                     <el-button size="small" type="primary"
-                                        @click="openDetailDialog(scope.row.stationId)">
+                                        @click="openDetailDialog(scope.row.stationId, scope.row.stationName)">
                                         查看详情
                                     </el-button>
                                 </template>
                             </el-table-column>
-                        </el-table>
-                    </el-card>
-                </el-tab-pane>
-
-                <!-- 告警列表标签页（按最新时间排序） -->
-                <el-tab-pane label="告警信息" name="alerts" :lazy="true">
-                    <el-card>
-                        <template #header>
-                            <div class="card-header">
-                                <span>当前告警列表</span>
-                                <el-button size="small" @click="refreshAlerts">刷新</el-button>
-                            </div>
-                        </template>
-
-                        <el-table :data="sortedAlerts" border stripe style="width: 100%">
-                            <el-table-column prop="timestamp" label="告警时间" width="200"></el-table-column>
-                            <el-table-column prop="stationId" label="充电桩ID" width="120"></el-table-column>
-                            <el-table-column prop="severity" label="告警级别" width="120">
-                                <template #default="scope">
-                                    <el-tag type="warning">{{ scope.row.severity }}</el-tag>
-                                </template>
-                            </el-table-column>
-                            <el-table-column prop="message" label="告警信息"></el-table-column>
                         </el-table>
                     </el-card>
                 </el-tab-pane>
@@ -120,43 +90,6 @@
                         <div v-else class="empty-tip">暂无快照数据</div>
                     </el-card>
                 </el-tab-pane>
-
-                <!-- 量子密钥数据标签页（按最新生成时间排序） -->
-                <!-- <el-tab-pane label="量子密钥数据" name="keys" :lazy="true">
-                    <el-card>
-                        <template #header>
-                            <div class="card-header">
-                                <span>所有量子密钥详情</span>
-                                <el-button size="small" @click="refreshKeys">刷新</el-button>
-                            </div>
-                        </template>
-
-                        <el-table :data="sortedKeyMaterials" border stripe style="width: 100%">
-                            <el-table-column prop="keyId" label="密钥ID" width="220"></el-table-column>
-                            <el-table-column label="所属充电桩" width="140">
-                                <template #default="scope">
-                                    {{ scope.row.keyId.split('-key-')[0] }}
-                                </template>
-                            </el-table-column>
-                            <el-table-column prop="stackIndex" label="栈索引" width="100"></el-table-column>
-                            <el-table-column prop="materialPreview" label="密钥内容" width="300"></el-table-column>
-                            <el-table-column prop="state" label="状态" width="120">
-                                <template #default="scope">
-                                    <el-tag :type="scope.row.state === 'USED' ? 'info' : 'success'">
-                                        {{ scope.row.state === 'USED' ? '已使用' : '可用' }}
-                                    </el-tag>
-                                </template>
-                            </el-table-column>
-                            <el-table-column prop="generatedAt" label="生成时间" width="200"></el-table-column>
-                            <el-table-column prop="consumedAt" label="消耗时间" width="200">
-                                <template #default="scope">
-                                    <span v-if="scope.row.consumedAt">{{ scope.row.consumedAt }}</span>
-                                    <span v-else>未消耗</span>
-                                </template>
-                            </el-table-column>
-                        </el-table>
-                    </el-card>
-                </el-tab-pane> -->
             </el-tabs>
         </el-main>
 
@@ -164,29 +97,20 @@
         <el-dialog v-model="detailDialogVisible" :title="detailDialogTitle" :width="detailDialogWidth"
             :before-close="handleDialogClose">
             <el-card class="detail-card">
-                <el-descriptions title="站点基本信息" border :column="4" style="margin-bottom: 16px;">
-                    <el-descriptions-item label="充电桩ID">{{ detailData.summary.stationId }}</el-descriptions-item>
-                    <el-descriptions-item label="充电桩名称">{{ detailData.summary.stationName }}</el-descriptions-item>
-                    <el-descriptions-item label="总容量">{{ detailData.summary.capacity }}</el-descriptions-item>
-                    <el-descriptions-item label="剩余密钥">{{ detailData.summary.remainingKeys }}</el-descriptions-item>
-                    <el-descriptions-item label="预警阈值">{{ detailData.summary.threshold }}</el-descriptions-item>
-                    <el-descriptions-item label="补充批次量">{{ detailData.summary.refillBatchSize }}</el-descriptions-item>
-                    <el-descriptions-item label="状态">
-                        <el-tag :type="statusTagType(detailData.summary.status)">
-                            {{ statusText(detailData.summary.status) }}
-                        </el-tag>
-                    </el-descriptions-item>
-                    <el-descriptions-item label="最后更新时间">{{ detailData.summary.lastUpdated }}</el-descriptions-item>
-                </el-descriptions>
-
                 <el-tabs v-model="detailTab" type="border-card" style="margin-bottom: 16px;">
                     <el-tab-pane label="可用密钥" name="available">
                         <el-table :data="detailData.availableKeys" border stripe style="width: 100%">
-                            <el-table-column prop="keyId" label="密钥ID" width="220"></el-table-column>
-                            <el-table-column prop="stackIndex" label="栈索引" width="100"></el-table-column>
-                            <el-table-column prop="materialPreview" label="密钥内容" width="300"></el-table-column>
-                            <el-table-column prop="generatedAt" label="生成时间" width="200"></el-table-column>
-                            <el-table-column label="操作" width="120">
+                            <el-table-column prop="keyId" label="密钥ID"></el-table-column>
+                            <el-table-column label="密钥状态" width="100">
+                                <template #default="scope">
+                                    <el-tag :type="statusTagType(scope.row.status)">
+                                        {{ statusText(scope.row.status) }}
+                                    </el-tag>
+                                </template>
+                            </el-table-column>
+                            <el-table-column prop="value" label="密钥内容"></el-table-column>
+                            <el-table-column prop="createTime" label="创建时间"></el-table-column>
+                            <el-table-column label="操作">
                                 <template #default="scope">
                                     <el-button size="small" type="danger"
                                         @click="consumeKey(detailData.summary.stationId, scope.row.keyId)">
@@ -198,35 +122,35 @@
                     </el-tab-pane>
                     <el-tab-pane label="已消耗密钥" name="consumed">
                         <el-table :data="detailData.consumedKeys" border stripe style="width: 100%">
-                            <el-table-column prop="keyId" label="密钥ID" width="220"></el-table-column>
-                            <el-table-column prop="stackIndex" label="栈索引" width="100"></el-table-column>
-                            <el-table-column prop="materialPreview" label="密钥内容" width="300"></el-table-column>
-                            <el-table-column prop="generatedAt" label="生成时间" width="200"></el-table-column>
-                            <el-table-column prop="consumedAt" label="消耗时间" width="200"></el-table-column>
+                            <el-table-column prop="keyId" label="密钥ID"></el-table-column>
+                            <el-table-column prop="stackIndex" label="栈索引"></el-table-column>
+                            <el-table-column prop="materialPreview" label="密钥内容"></el-table-column>
+                            <el-table-column prop="generatedAt" label="生成时间"></el-table-column>
+                            <el-table-column prop="consumedAt" label="消耗时间"></el-table-column>
                         </el-table>
                     </el-tab-pane>
                     <el-tab-pane label="使用记录" name="usage">
                         <el-table :data="detailData.recentUsage" border stripe style="width: 100%">
-                            <el-table-column label="使用时间" width="200">
+                            <el-table-column label="使用时间">
                                 <template #default="scope">{{ scope.row.occurredAt || '无' }}</template>
                             </el-table-column>
-                            <el-table-column label="密钥ID" width="220">
+                            <el-table-column label="密钥ID">
                                 <template #default="scope">{{ scope.row.keyId || '无' }}</template>
                             </el-table-column>
-                            <el-table-column label="剩余密钥数" width="120">
+                            <el-table-column label="剩余密钥数">
                                 <template #default="scope">{{ scope.row.remaining || '无' }}</template>
                             </el-table-column>
                         </el-table>
                     </el-tab-pane>
                     <el-tab-pane label="补充记录" name="refill">
                         <el-table :data="detailData.refillHistory" border stripe style="width: 100%">
-                            <el-table-column label="补充时间" width="200">
+                            <el-table-column label="补充时间">
                                 <template #default="scope">{{ scope.row.refilledAt || '无' }}</template>
                             </el-table-column>
-                            <el-table-column label="补充密钥数" width="120">
+                            <el-table-column label="补充密钥数">
                                 <template #default="scope">{{ scope.row.keysAdded || '无' }}</template>
                             </el-table-column>
-                            <el-table-column label="补充来源" width="120">
+                            <el-table-column label="补充来源">
                                 <template #default="scope">{{ scope.row.source || '无' }}</template>
                             </el-table-column>
                         </el-table>
@@ -270,35 +194,31 @@ const detailDialogVisible = ref(false);
 const detailDialogTitle = ref('站点密钥详情');
 const detailDialogWidth = ref('90%');
 
-// 状态文本映射
-const statusText = (status) => {
-    const map = {
-        'NORMAL': '正常',
-        'WARNING': '预警',
-        'DEPLETED': '耗尽',
-        'REFILLING': '补充中'
-    };
-    return map[status] || status;
+// 状态标签颜色映射
+const statusTagType = (status) => {
+    switch (status) {
+        case 0: return 'success'; // 绿色 (有效)
+        case 1: return '';        // 默认蓝色 (冷冻) - 也可以写 'primary'
+        case 2: return 'danger';  // 红色 (删除)
+        default: return 'info';   // 灰色 (未知)
+    }
 };
 
-// 状态标签样式映射
-const statusTagType = (status) => {
+// 状态文字显示映射
+const statusText = (status) => {
     const map = {
-        'NORMAL': 'success',
-        'WARNING': 'warning',
-        'DEPLETED': 'danger',
-        'REFILLING': 'info'
+        0: '有效',
+        1: '冷冻',
+        2: '删除'
     };
-    return map[status] || 'info';
+    // 使用 map[status] 获取文字，如果不存在则显示 '未知'
+    return map[status] ?? '未知';
 };
 
 // 1. 密钥池状态：按充电桩序号升序排序（提取stationId数字部分比较）
 const sortedKeyPools = computed(() => {
     return [...keyPools.value].sort((a, b) => {
-        // 提取stationId中的数字（支持station_001、1001等格式）
-        const numA = parseInt(a.stationId.replace(/\D/g, '')) || 0;
-        const numB = parseInt(b.stationId.replace(/\D/g, '')) || 0;
-        return numA - numB;
+        return a.stationName.localeCompare(b.stationName, 'en', { numeric: true });
     });
 });
 
@@ -396,38 +316,26 @@ const fetchKeyMaterials = async () => {
     }
 };
 
-const fetchStationDetail = async (stationId) => {
+// 获取可用密钥
+const fetchUsableKeys = async (stationName) => {
     try {
-        const response = await keyManageApi.getStationDetail(stationId);
-        const data = response.data.data || {};
-        detailData.value = {
-            summary: data.summary || {},
-            availableKeys: data.availableKeys || [],
-            consumedKeys: data.consumedKeys || [],
-            recentUsage: data.recentUsage || [],
-            refillHistory: data.refillHistory || []
-        };
-        detailDialogTitle.value = `${data.summary?.stationName || '未知站点'}（${stationId}）密钥详情`;
+        const response = await keyManageApi.getUsableKeys(stationName);
+        return Array.isArray(response.data.data) ? response.data.data : [];
     } catch (error) {
-        console.error(`获取充电桩${stationId}详情失败:`, error);
-        ElMessage.error(`获取充电桩${stationId}详情失败`);
-        detailData.value = {
-            summary: {},
-            availableKeys: [],
-            consumedKeys: [],
-            recentUsage: [],
-            refillHistory: []
-        };
+        console.error(`获取充电桩${stationName}可用密钥失败:`, error);
+        ElMessage.error(`获取充电桩${stationName}可用密钥失败`);
+        return [];
     }
 };
 
-const fetchStaticKeys = async (stationId) => {
+// 获取已消耗密钥
+const fetchConsumedKeys = async (stationId) => {
     try {
-        const response = await keyManageApi.getStaticKeys(stationId);
-        return Array.isArray(response.data) ? response.data : [];
+        const response = await keyManageApi.getConsumedKeys(stationId);
+        return Array.isArray(response.data.data) ? response.data.data : [];
     } catch (error) {
-        console.error(`获取充电桩${stationId}静态密钥失败:`, error);
-        ElMessage.error(`获取充电桩${stationId}静态密钥失败`);
+        console.error(`获取充电桩${stationId}已消耗密钥失败:`, error);
+        ElMessage.error(`获取充电桩${stationId}已消耗密钥失败`);
         return [];
     }
 };
@@ -450,20 +358,16 @@ const refreshKeys = () => {
 };
 
 // 打开详情弹窗
-const openDetailDialog = async (stationId) => {
+const openDetailDialog = async (stationId, stationName) => {
     if (!stationId) {
         ElMessage.warning('请选择有效的充电桩');
         return;
     }
     currentStationId.value = stationId;
-    await fetchStationDetail(stationId);
-    await fetchStaticKeys(stationId);
-    detailDialogVisible.value = true;
-};
+    detailData.value.availableKeys = await fetchUsableKeys(stationName);
+    console.log(detailData.value.availableKeys);
 
-// 表格行点击事件
-const handleRowClick = (row) => {
-    openDetailDialog(row.stationId);
+    detailDialogVisible.value = true;
 };
 
 // 关闭弹窗时的处理
