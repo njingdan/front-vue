@@ -6,7 +6,7 @@
           <span>拓扑工具栏</span>
         </div>
         <el-form :model="toolbar" label-position="top" class="toolbar-form">
-          <el-form-item  label-class="custom-label">
+          <el-form-item label-class="custom-label">
             <div class="legend-title">布局算法</div>
             <el-radio-group v-model="toolbar.layout" size="mini">
               <el-radio-button label="force">力导向</el-radio-button>
@@ -14,7 +14,7 @@
               <el-radio-button label="circular">圆形</el-radio-button>
             </el-radio-group>
           </el-form-item>
-          <el-form-item  label-class="custom-label">
+          <el-form-item label-class="custom-label">
             <div class="legend-title">节点筛选</div>
             <el-input v-model="toolbar.keyword" placeholder="输入设备名称" clearable />
           </el-form-item>
@@ -73,10 +73,28 @@
                 {{ selectedEntity.status }}
               </el-tag>
             </el-descriptions-item>
-            <el-descriptions-item v-if="selectedEntity.type === 'node' && selectedEntity.deviceType === 'storage'"
-              label="量子密钥">
-              {{ selectedEntity.quantumKey || '未分配' }}
-            </el-descriptions-item>
+            <template v-if="selectedEntity.type === 'node' && selectedEntity.deviceType === 'storage'">
+              <el-descriptions-item label="总容量">{{ stationDetail.capacity || '加载中...' }}</el-descriptions-item>
+              <el-descriptions-item label="剩余密钥数">{{ stationDetail.remainingKeys || '加载中...' }}</el-descriptions-item>
+              <el-descriptions-item label="阈值">{{ stationDetail.threshold || '加载中...' }}</el-descriptions-item>
+              <el-descriptions-item label="补充批量">{{ stationDetail.refillBatchSize || '加载中...' }}</el-descriptions-item>
+              <el-descriptions-item label="密钥池状态">
+                <el-tag effect="dark" :type="stationDetail.status === 'NORMAL' ? 'success' : 'warning'">
+                  {{ stationDetail.status === 'NORMAL' ? '正常' : '异常' }}
+                </el-tag>
+              </el-descriptions-item>
+              <el-descriptions-item label="警告信息">{{ stationDetail.warningMessage || '无' }}</el-descriptions-item>
+              <el-descriptions-item label="最后更新">
+                {{ stationDetail.lastUpdated ? formatDate(stationDetail.lastUpdated) : '未知' }}
+              </el-descriptions-item>
+             
+              <!-- 新增：管理密钥按钮 -->
+              <el-descriptions-item label="管理秘钥" style="margin-top: 16px; text-align: right;">
+                <el-button type="primary" @click="goToKeyManagement(selectedEntity.id)">
+                  查看详情
+                </el-button>
+              </el-descriptions-item>
+            </template>
             <el-descriptions-item v-if="selectedEntity.type === 'edge'" label="传输方向">
               {{ selectedEntity.source }} → {{ selectedEntity.target }}
             </el-descriptions-item>
@@ -95,6 +113,48 @@ import { ref, watch, onMounted, onBeforeUnmount, computed } from 'vue'
 import * as echarts from 'echarts'
 import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 import { ElCol } from 'element-plus'
+import keyManageApi from '@/api/key-manage.js';
+import { useRouter } from 'vue-router'
+import { useStationStore } from '@/store/station'; // 引入状态管理
+
+const router = useRouter();
+const stationStore = useStationStore();
+
+// 点击“管理密钥”按钮时触发
+const goToKeyManagement = (stationId) => {
+  // 1. 将stationId存入状态管理
+  stationStore.setStationId(stationId); // 如存入"station-6"
+  // 2. 跳转至密钥管理页面（URL为/module/key-manage，无参数）
+  router.push({ name: '秘钥管理' });
+};
+
+const stationDetail = ref({}); // 存储站点详细信息
+
+
+// 格式化时间（兼容UTC格式）
+const formatDate = (timeStr) => {
+  if (!timeStr) return '未知'; // 无数据时返回未知
+  try {
+    const date = new Date(timeStr);
+    // 检查是否为有效时间
+    if (isNaN(date.getTime())) {
+      return '格式错误';
+    }
+    // 格式化成本地时间（年月日 时分秒）
+    return date.toLocaleString('zh-CN', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false // 24小时制
+    });
+  } catch (error) {
+    console.error('时间格式化失败：', error);
+    return '解析失败';
+  }
+};
 
 // 随机状态生成函数
 const getRandomStatus = () => {
@@ -139,7 +199,7 @@ const toolbar = ref({
 
 // 提取储能柜节点便于单独处理布局
 const storageCabinets = Array.from({ length: 13 }, (_, i) => ({
-  id: `storageCabinet${i + 1}`,
+  id: `station-${i + 1}`,
   name: `储能柜${i + 1}`,
   status: getRandomStatus(),
   type: 'storage',
@@ -259,13 +319,42 @@ const initChart = () => {
   if (!topologyChart.value) return
   chart.value = echarts.init(topologyChart.value)
 
+  // chart.value.on('click', params => {
+  //   if (params.dataType === 'node') {
+  //     selectedEntity.value = { ...params.data, type: 'node' }
+  //   } else if (params.dataType === 'edge') {
+  //     selectedEntity.value = { ...params.data, type: 'edge', name: `${params.data.source} → ${params.data.target}` }
+  //   }
+  // })
   chart.value.on('click', params => {
     if (params.dataType === 'node') {
-      selectedEntity.value = { ...params.data, type: 'node' }
+      // 选中节点时更新选中状态
+      selectedEntity.value = { ...params.data, type: 'node' };
+
+      // 仅当点击储能柜时，调用接口调用API
+      if (params.data.type === 'storage') {
+        // 调用getStationDetail接口，传入储能柜ID（params.data.id）
+        console.log(params.data.id)
+        keyManageApi.getStationDetail(params.data.id)
+          .then(res => {
+            // 假设接口返回的数据结构直接包含所需字段
+            console.log(res.data.data.summary);
+            stationDetail.value = res.data.data.summary;
+          })
+          .catch(err => {
+            console.error('获取站点详情失败:', err);
+            stationDetail.value = { warningMessage: '获取详情失败' };
+          });
+      } else {
+        // 非储能柜时清空详情
+        stationDetail.value = {};
+      }
     } else if (params.dataType === 'edge') {
-      selectedEntity.value = { ...params.data, type: 'edge', name: `${params.data.source} → ${params.data.target}` }
+      selectedEntity.value = { ...params.data, type: 'edge', name: `${params.data.source} → ${params.data.target}` };
+      // 点击链路时也清空站点详情
+      stationDetail.value = {};
     }
-  })
+  });
 
   renderChart()
 }
@@ -482,16 +571,16 @@ watch(() => topology.value.nodes, renderChart, { deep: true })
   margin: 0 !important;
 }
 
-.toolbar-form  .el-form-item--label {
-  font-size:16px;
+.toolbar-form .el-form-item--label {
+  font-size: 16px;
   font-weight: 200;
-  color:#303133
+  color: #303133
 }
 
-.custom-label{
-  font-size:16px;
+.custom-label {
+  font-size: 16px;
   font-weight: 200;
-  color:#909399 
+  color: #909399
 }
 
 .service-topology-page {
@@ -578,11 +667,11 @@ watch(() => topology.value.nodes, renderChart, { deep: true })
 }
 
 .legend-title {
-    font-weight: 600;
-    margin-top: 8px;
-    color: #303133;
-    font-size: 14px;
-  }
+  font-weight: 600;
+  margin-top: 8px;
+  color: #303133;
+  font-size: 14px;
+}
 
 .legend-section {
   display: flex;

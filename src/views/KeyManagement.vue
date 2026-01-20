@@ -66,11 +66,11 @@
                             <el-descriptions title="快照概览" border :column="4">
                                 <el-descriptions-item label="快照时间">{{ snapshotData.generatedAt }}</el-descriptions-item>
                                 <el-descriptions-item label="总剩余密钥">{{ snapshotData.totalRemaining
-                                    }}</el-descriptions-item>
+                                }}</el-descriptions-item>
                                 <el-descriptions-item label="总容量">{{ snapshotData.totalCapacity
-                                    }}</el-descriptions-item>
+                                }}</el-descriptions-item>
                                 <el-descriptions-item label="告警站点数">{{ snapshotData.warningStationCount
-                                    }}</el-descriptions-item>
+                                }}</el-descriptions-item>
                             </el-descriptions>
                             <el-table :data="sortedSnapshotStations" border stripe
                                 style="width: 100%; margin-top: 16px;">
@@ -168,6 +168,13 @@
 import { ref, onMounted, watch, computed } from 'vue';
 import { ElMessage } from 'element-plus';
 import keyManageApi from '@/api/key-manage.js';
+import { useRoute } from 'vue-router';
+import { useStationStore } from '@/store/station.js';
+
+const route = useRoute();
+
+//接收参数信息，如果有stationId参数，则显示详情弹窗
+//如果没有，正常显示
 
 // 状态管理
 const activeTab = ref('pools');
@@ -372,7 +379,8 @@ const openDetailDialog = async (stationId, stationName) => {
 
 // 关闭弹窗时的处理
 const handleDialogClose = () => {
-    detailDialogVisible.value = false;
+  detailDialogVisible.value = false;
+  
 };
 
 // 消耗密钥函数
@@ -424,11 +432,35 @@ const consumeKey = async (stationId, keyId) => {
     }
 };
 
-// 页面加载时初始化数据
+const stationStore = useStationStore();
+
+// 页面初始化时获取参数
 onMounted(() => {
-    fetchKeyPools();
-    fetchAlerts();
+  // 1. 加载页面基础数据
+  fetchKeyPools();
+  fetchAlerts();
+  
+  // 2. 从状态管理获取stationId
+  const stationId = stationStore.stationId;
+  if (stationId) {
+    // 打开对应储能柜的详情弹窗
+    openDetailDialog(stationId);
+    // 3. 用完后立即清空，避免刷新页面时重复打开
+    stationStore.clearStationId();
+  }
 });
+
+// 监听路由参数变化（如从其他页面跳转过来时）
+watch(
+  () => route.params.stationId, // 监听stationId参数变化
+  (newStationId) => {
+    if (newStationId) {
+      openDetailDialog(newStationId); // 新参数存在时打开弹窗
+    } else {
+      detailDialogVisible.value = false; // 参数消失时关闭弹窗
+    }
+  }
+);
 
 // 监听标签页切换，加载对应数据
 watch(activeTab, (newVal) => {
@@ -445,9 +477,12 @@ watch(activeTab, (newVal) => {
 <style scoped>
 /* 新增：筛选区域样式 */
 .filter-container {
-    margin-bottom: 16px; /* 与表格保持距离 */
-    display: flex; /* 横向排列控件 */
-    align-items: center; /* 垂直居中 */
+    margin-bottom: 16px;
+    /* 与表格保持距离 */
+    display: flex;
+    /* 横向排列控件 */
+    align-items: center;
+    /* 垂直居中 */
 }
 
 .app-container {
