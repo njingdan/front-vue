@@ -31,22 +31,6 @@ const keyManageApi = {
   },
 
   /**
-   * 获取所有密钥池完整快照
-   * @returns {Promise}
-   */
-  getSnapshot: () => {
-    return get('/api/key-management/snapshot');
-  },
-
-  /**
-   * 获取具体量子密钥数据信息
-   * @returns {Promise}
-   */
-  getKeyMaterials: () => {
-    return get('/api/key-management/keys');
-  },
-
-  /**
    * 获取指定充电桩的可用密钥数据
    * @param {string} stationName - 充电桩Name
    * @returns {Promise}
@@ -62,7 +46,26 @@ const keyManageApi = {
    */
   getUnusableKeys: (stationName) => {
     return get(`/api/key-management/pools/unusable_keys/${stationName}`);
-  }
+  },
+
+  /**
+   * 获取指定充电桩的密钥使用记录
+   * @param {string} stationName - 充电桩Name
+   * @returns {Promise}
+   */
+  getUsageRecords: (stationName) => {
+    return get(`/api/key-management/getUsekeyLog?stationName=${stationName}`);
+  },
+
+  /**
+   * 获取指定充电桩的密钥补充记录
+   * @param {string} stationName - 充电桩Name
+   * @returns {Promise}
+   */
+  getRefillHistory: (stationName) => {
+    return get(`/api/key-management/getAddkeyLog?stationName=${stationName}`);
+  } 
+
 };
 
 export default keyManageApi;
