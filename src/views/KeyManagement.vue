@@ -25,7 +25,7 @@
                         </div>
 
                         <el-table :data="filteredKeyPools" border stripe style="width: 100%">
-                            <el-table-column prop="stationId" label="储能柜ID" align="center"></el-table-column>
+                
                             <el-table-column prop="stationName" label="储能柜名称" align="center"></el-table-column>
                             <el-table-column prop="remainingKeys" label="剩余密钥" align="center"></el-table-column>
                             <el-table-column prop="capacity" label="总容量" align="center"></el-table-column>
@@ -83,13 +83,13 @@
                         <el-table :data="detailData.refillHistory" border stripe style="width: 100%">
                             <el-table-column prop="secretKeyId" label="密钥ID" align="center"></el-table-column>
                             <el-table-column prop="keyContent" label="密钥内容" align="center"></el-table-column>
-                            <el-table-column prop="keyState" label="状态" align="center">
+                            <!-- <el-table-column prop="keyState" label="状态" align="center">
                                 <template #default="scope">
                                     <el-tag :type="scope.row.status === 1 || scope.row.status === '正常' ? 'success' : 'danger'">
                                         {{ scope.row.status === 1 || scope.row.status === '正常' ? '正常' : '异常' }}
                                     </el-tag>
                                 </template>
-                            </el-table-column>
+                            </el-table-column> -->
                             <el-table-column prop="addTime" label="补充时间"  align="center"></el-table-column>
                         </el-table>
                     </el-tab-pane>
@@ -171,9 +171,8 @@ const filteredKeyPools = computed(() => {
     return sortedKeyPools.value.filter(item => {
         // 1. 关键词筛选（匹配充电桩ID或名称）
         const keywordMatch = filterKeyword.value
-            ? (item.stationId && item.stationId == filterKeyword.value) ||
-            (item.stationName && item.stationName == filterKeyword.value)
-            : true;
+        ? (item.stationName && item.stationName.includes(filterKeyword.value)) // 仅模糊匹配 stationName
+        : true;
 
         // 2. 状态筛选（匹配选中的状态）
         const statusMatch = filterStatus.value
