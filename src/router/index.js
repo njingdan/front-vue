@@ -26,9 +26,9 @@ const router = createRouter({
           },
         },
         {
-          path: "key-distribute",
-          name: "秘钥分发",
-          component: () => import("@/views/KeyDistribution.vue"),
+          path: "key-negotiation",
+          name: "秘钥协商",
+          component: () => import("@/views/KeyNegotiation.vue"),
         },
         {
           path: "encrypt",

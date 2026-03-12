@@ -56,9 +56,9 @@ const handleClose = (key, keyPath) => {
                     <span>设备认证</span>
                 </el-menu-item>
 
-                <el-menu-item index="/module/key-distribute">
+                <el-menu-item index="/module/key-negotiation">
                     <el-icon><Promotion /></el-icon>
-                    <span>秘钥分发</span>
+                    <span>秘钥协商</span>
                 </el-menu-item>
 
                 <el-sub-menu index="/module">
