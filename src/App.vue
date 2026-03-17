@@ -46,5 +46,9 @@ const sidebarStore = useSidebarStore();
   background-color: #fff;
 }
 
+.el-main {
+  --el-main-padding: 0px;
+}
+
 
 </style>

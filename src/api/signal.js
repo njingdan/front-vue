@@ -11,7 +11,6 @@ export function fetchLatestWaveform() {
 export function subscribeWaveform(callback) {
   const eventSource = new EventSource(`http://localhost:8000${base}/stream`);
   console.log(base + '/stream');
-  
 
   eventSource.addEventListener('signal', (event) => {
     const data = JSON.parse(event.data);

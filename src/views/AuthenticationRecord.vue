@@ -2,7 +2,7 @@
   <div class="auth-record-currentPage p-6">
     <!-- 标题栏 -->
     <div class="flex justify-between items-center mb-4">
-      <h1 class="text-lg font-semibold" style="margin-bottom: 10px;">📡 设备认证记录管理</h1>
+      <h1 class="text-lg font-semibold" style="margin-bottom: 10px; margin-top: 10px;">📡 设备认证记录管理</h1>
     </div>
 
     <!-- 数据统计 -->

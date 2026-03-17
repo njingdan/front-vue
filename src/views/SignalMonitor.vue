@@ -21,6 +21,7 @@ onMounted(async () => {
   // 获取初始数据
   try {
     const res = await fetchLatestWaveform()
+    
     if (res.data) {
       waveform.value = res.data
       latestTimestamp.value = res.data.timestamp
