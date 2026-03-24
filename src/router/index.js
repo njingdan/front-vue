@@ -39,6 +39,7 @@ const router = createRouter({
           component: () => import("@/views/AuthenticationRecord.vue"),
         },
         { path: "log", component: () => import("@/views/LogManagement.vue") },
+        { path: "test", component: () => import("@/views/SignalUploadTest.vue") },
       ],
     },
   ],

@@ -25,8 +25,6 @@ onMounted(async () => {
     if (res.data) {
       waveform.value = res.data
       latestTimestamp.value = res.data.timestamp
-      console.log(waveform.value);
-      
     }
   } catch (err) {
     console.error('获取初始波形失败:', err)
