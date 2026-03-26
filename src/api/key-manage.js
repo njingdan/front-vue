@@ -15,19 +15,11 @@ const keyManageApi = {
 
   /**
    * 获取指定充电桩的密钥池详细信息
-   * @param {string} stationId - 充电桩ID
+   * @param {string} stationName - 充电桩Name
    * @returns {Promise}
    */
-  getStationDetail: (stationId) => {
-    return get(`/api/key-management/pools/${stationId}`);
-  },
-
-  /**
-   * 获取当前告警列表
-   * @returns {Promise}
-   */
-  getAlerts: () => {
-    return get('/api/key-management/alerts');
+  getStationDetail: (stationName) => {
+    return get(`/api/key-management/pools/${stationName}`);
   },
 
   /**

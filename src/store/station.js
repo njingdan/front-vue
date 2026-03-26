@@ -3,16 +3,16 @@ import { defineStore } from 'pinia';
 
 export const useStationStore = defineStore('station', {
   state: () => ({
-    stationId: '' // 存储当前需要打开的储能柜ID
+    stationName: '' // 存储当前需要打开的储能柜ID
   }),
   actions: {
-    // 设置stationId
-    setStationId(id) {
-      this.stationId = id;
+    // 设置stationName
+    setStationName(name) {
+      this.stationName = name;
     },
-    // 清空stationId
-    clearStationId() {
-      this.stationId = '';
+    // 清空stationName
+    clearStationName() {
+      this.stationName = '';
     }
   }
 });

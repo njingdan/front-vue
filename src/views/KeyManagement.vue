@@ -198,17 +198,6 @@ const fetchKeyPools = async () => {
     }
 };
 
-const fetchAlerts = async () => {
-    try {
-        const response = await keyManageApi.getAlerts();
-        alerts.value = response.data.data || [];
-    } catch (error) {
-        console.error('获取告警列表失败:', error);
-        ElMessage.error('获取告警列表失败');
-        alerts.value = [];
-    }
-};
-
 const fetchKeyMaterials = async () => {
     try {
         const response = await keyManageApi.getKeyMaterials();
@@ -265,15 +254,13 @@ const refreshPools = () => {
 
 // 打开详情弹窗
 const openDetailDialog = async (stationId, stationName) => {
-    if (!stationId) {
-        ElMessage.warning('请选择有效的充电桩');
-        return;
-    }
     currentStationId.value = stationId;
-    detailData.value.availableKeys = await fetchUsableKeys(stationName);
+    detailData.value.availableKeys = await fetchUsableKeys(stationName);    
     detailData.value.recentUsage = await fetchUsageRecords(stationName);
     detailData.value.refillHistory = await fetchRefillHistory(stationName);
     detailDialogVisible.value = true;
+    console.log(detailData.value);
+
 };
 
 // 关闭弹窗时的处理
@@ -287,29 +274,7 @@ const stationStore = useStationStore();
 onMounted(() => {
   // 1. 加载页面基础数据
   fetchKeyPools();
-  fetchAlerts();
-  
-  // 2. 从状态管理获取stationId
-  const stationId = stationStore.stationId;
-  if (stationId) {
-    // 打开对应储能柜的详情弹窗
-    openDetailDialog(stationId);
-    // 3. 用完后立即清空，避免刷新页面时重复打开
-    stationStore.clearStationId();
-  }
 });
-
-// 监听路由参数变化（如从其他页面跳转过来时）
-watch(
-  () => route.params.stationId, // 监听stationId参数变化
-  (newStationId) => {
-    if (newStationId) {
-      openDetailDialog(newStationId); // 新参数存在时打开弹窗
-    } else {
-      detailDialogVisible.value = false; // 参数消失时关闭弹窗
-    }
-  }
-);
 
 // 监听标签页切换，加载对应数据
 watch(activeTab, (newVal) => {
@@ -317,8 +282,6 @@ watch(activeTab, (newVal) => {
         fetchSnapshot();
     } else if (newVal === 'keys') {
         fetchKeyMaterials();
-    } else if (newVal === 'alerts') {
-        fetchAlerts();
     }
 });
 </script>

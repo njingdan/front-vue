@@ -67,30 +67,23 @@
 
           <el-descriptions :column="1" border class="property-descriptions">
             <el-descriptions-item label="类型">{{ getEntityTypeName(selectedEntity) }}</el-descriptions-item>
-            <el-descriptions-item label="状态">
-              <el-tag effect="dark" :type="selectedEntity.status === '故障' ? 'danger' :
-                selectedEntity.status === '数据传输中' ? 'primary' : 'success'">
-                {{ selectedEntity.status }}
-              </el-tag>
-            </el-descriptions-item>
             <template v-if="selectedEntity.type === 'node' && selectedEntity.deviceType === 'storage'">
-              <el-descriptions-item label="总容量">{{ stationDetail.capacity || '加载中...' }}</el-descriptions-item>
-              <el-descriptions-item label="剩余密钥数">{{ stationDetail.remainingKeys || '加载中...' }}</el-descriptions-item>
-              <el-descriptions-item label="阈值">{{ stationDetail.threshold || '加载中...' }}</el-descriptions-item>
-              <el-descriptions-item label="补充批量">{{ stationDetail.refillBatchSize || '加载中...' }}</el-descriptions-item>
+              <el-descriptions-item label="总容量">{{ stationDetail.capacity }}</el-descriptions-item>
+              <el-descriptions-item label="剩余密钥数">{{ stationDetail.remainingKeys }}</el-descriptions-item>
+              <el-descriptions-item label="阈值">{{ stationDetail.threshold }}</el-descriptions-item>
+              <el-descriptions-item label="补充批量">{{ stationDetail.refillBatchSize }}</el-descriptions-item>
               <el-descriptions-item label="密钥池状态">
-                <el-tag effect="dark" :type="stationDetail.status === 'NORMAL' ? 'success' : 'warning'">
-                  {{ stationDetail.status === 'NORMAL' ? '正常' : '异常' }}
+                <el-tag effect="dark" :type="stationDetail.status === '正常' ? 'success' : 'warning'">
+                  {{ stationDetail.status === '正常' ? '正常' : '异常' }}
                 </el-tag>
               </el-descriptions-item>
-              <el-descriptions-item label="警告信息">{{ stationDetail.warningMessage || '无' }}</el-descriptions-item>
               <el-descriptions-item label="最后更新">
-                {{ stationDetail.lastUpdated ? formatDate(stationDetail.lastUpdated) : '未知' }}
+                {{ formatDate(stationDetail.lastUpdateTime) || '未知' }}
               </el-descriptions-item>
              
               <!-- 新增：管理密钥按钮 -->
               <el-descriptions-item label="管理秘钥" style="margin-top: 16px; text-align: right;">
-                <el-button type="primary" @click="goToKeyManagement(selectedEntity.id)">
+                <el-button type="primary" @click="goToKeyManagement()">
                   查看详情
                 </el-button>
               </el-descriptions-item>
@@ -115,16 +108,11 @@ import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 import { ElCol } from 'element-plus'
 import keyManageApi from '@/api/key-manage.js';
 import { useRouter } from 'vue-router'
-import { useStationStore } from '@/store/station'; // 引入状态管理
 
 const router = useRouter();
-const stationStore = useStationStore();
 
 // 点击“管理密钥”按钮时触发
-const goToKeyManagement = (stationId) => {
-  // 1. 将stationId存入状态管理
-  stationStore.setStationId(stationId); // 如存入"station-6"
-  // 2. 跳转至密钥管理页面（URL为/module/key-manage，无参数）
+const goToKeyManagement = () => {
   router.push({ name: '秘钥管理' });
 };
 
@@ -199,8 +187,8 @@ const toolbar = ref({
 
 // 提取储能柜节点便于单独处理布局
 const storageCabinets = Array.from({ length: 13 }, (_, i) => ({
-  id: `station-${i + 1}`,
-  name: `储能柜${i + 1}`,
+  id: `${i + 1}`,
+  name: `CB${i + 1}`,
   status: getRandomStatus(),
   type: 'storage',
   quantumKey: generateQuantumKey(),
@@ -333,13 +321,13 @@ const initChart = () => {
 
       // 仅当点击储能柜时，调用接口调用API
       if (params.data.type === 'storage') {
-        // 调用getStationDetail接口，传入储能柜ID（params.data.id）
-        console.log(params.data.id)
-        keyManageApi.getStationDetail(params.data.id)
+        // 调用getStationDetail接口，传入储能柜Name（params.data.name）
+        keyManageApi.getStationDetail(params.data.name)
           .then(res => {
             // 假设接口返回的数据结构直接包含所需字段
-            console.log(res.data.data.summary);
-            stationDetail.value = res.data.data.summary;
+            console.log(res.data.data);
+            
+            stationDetail.value = res.data.data;
           })
           .catch(err => {
             console.error('获取站点详情失败:', err);
