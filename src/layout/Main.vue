@@ -83,7 +83,7 @@
              
               <!-- 新增：管理密钥按钮 -->
               <el-descriptions-item label="管理秘钥" style="margin-top: 16px; text-align: right;">
-                <el-button type="primary" @click="goToKeyManagement()">
+                <el-button type="primary" @click="goToKeyManagement(selectedEntity.name)">
                   查看详情
                 </el-button>
               </el-descriptions-item>
@@ -112,7 +112,7 @@ import { useRouter } from 'vue-router'
 const router = useRouter();
 
 // 点击“管理密钥”按钮时触发
-const goToKeyManagement = () => {
+const goToKeyManagement = (stationName) => {
   router.push({ name: '秘钥管理' });
 };
 

@@ -1,4 +1,4 @@
-import { get } from '../axios/request';
+import { get, post } from '../axios/request';
 
 // 获取储能柜协商数据
 export function getCabinetNegotiation(cabinetId) {
@@ -15,8 +15,14 @@ export function getRssiData(cabinetId) {
   return get('/api/key-negotiate/getRssiData', { cabinetId });
 }
 
+// 获取单个RSSI值
+export function getSingleRssiData(cabinetId, rssi = 100) {
+  return post('/api/key-negotiate/getSingleRssiData', { cabinetId, rssi });
+}
+
 export default {
   getCabinetNegotiation,
   getNegotiateStatus,
-  getRssiData
+  getRssiData,
+  getSingleRssiData
 };

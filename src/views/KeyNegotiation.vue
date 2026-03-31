@@ -1,47 +1,47 @@
 <template>
   <div class="key-negotiation-container">
-    <!-- 页面标题 -->
     <div class="page-header">
       <h1>储能柜密钥协商</h1>
     </div>
-    
-    <!-- 主要内容区 -->
+
     <div class="main-content">
-      <!-- 储能柜列表卡片 -->
+      <!-- 柜子列表 -->
       <el-card class="stat-card cabinet-list-card">
         <div class="card-header">
           <h2>储能柜列表</h2>
         </div>
-        
-        <!-- 储能柜列表 -->
+
         <div class="cabinet-list">
-          <el-button 
-            v-for="cabinet in cabinets" 
+          <el-button
+            v-for="cabinet in cabinets"
             :key="cabinet.id"
             :type="selectedCabinet === cabinet.id ? 'primary' : 'default'"
-            size="default"
             @click="selectCabinet(cabinet.id)"
           >
             {{ cabinet.name }}
           </el-button>
         </div>
       </el-card>
-      
-      <!-- 密钥协商过程卡片 -->
+
+      <!-- 协商过程 -->
       <el-card v-if="selectedCabinet" class="stat-card negotiation-process-card">
         <div class="card-header">
           <h2>{{ selectedCabinetName }} 密钥协商过程</h2>
-          <el-tag effect="dark" :type="getStatusType()">
+          <el-tag :type="getStatusType()">
             {{ currentStatusText }}
           </el-tag>
         </div>
-        
-        <!-- 流程步骤 -->
+
+        <!-- 阶段 -->
         <div class="stage-indicators">
-          <div class="stage-line" :style="{ width: `${(currentStatus + 1) / processSteps.length * 100}%` }"></div>
-          <div 
-            v-for="(step, index) in processSteps" 
-            :key="index" 
+          <div
+            class="stage-line"
+            :style="{ width: `${(currentStatus + 1) / processSteps.length * 100}%` }"
+          ></div>
+
+          <div
+            v-for="(step, index) in processSteps"
+            :key="index"
             class="stage-indicator"
             :class="{
               completed: currentStatus >= index,
@@ -49,25 +49,20 @@
             }"
           >
             <div class="stage-icon">
-              <el-icon v-if="currentStatus >= index">
-                <Check />
-              </el-icon>
-              <el-icon v-else>
-                <Loading />
-              </el-icon>
+              <el-icon v-if="currentStatus >= index"><Check /></el-icon>
+              <el-icon v-else><Loading /></el-icon>
             </div>
             <div class="stage-name">{{ step }}</div>
           </div>
         </div>
-        
-        <!-- RSSI 曲线图 -->
+
+        <!-- 图表 -->
         <div class="rssi-chart">
           <el-divider content-position="left">RSSI 数据曲线</el-divider>
           <div ref="chartRef" class="chart-container"></div>
         </div>
       </el-card>
-      
-      <!-- 未选择储能柜提示 -->
+
       <div v-else class="no-selection">
         <el-empty description="请选择一个储能柜查看密钥协商过程" />
       </div>
@@ -76,264 +71,202 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, onActivated, computed, watch, reactive } from 'vue';
+import {
+  ref,
+  reactive,
+  computed,
+  watch,
+  onMounted,
+  onUnmounted,
+  nextTick
+} from 'vue';
 import * as echarts from 'echarts';
 import { Check, Loading } from '@element-plus/icons-vue';
-import { getCabinetNegotiation, getNegotiateStatus, getRssiData } from '../api/key-negotiation';
+import { ElMessage } from 'element-plus';
 
-// 储能柜列表（示例数据，实际可能从后端获取）
-const cabinets = ref([
-  { id: 'CB001', name: '储能柜 1' },
-  { id: 'CB002', name: '储能柜 2' },
-  { id: 'CB003', name: '储能柜 3' },
-  { id: 'CB004', name: '储能柜 4' },
-  { id: 'CB005', name: '储能柜 5' },
-  { id: 'CB006', name: '储能柜 6' },
-  { id: 'CB007', name: '储能柜 7' },
-  { id: 'CB008', name: '储能柜 8' },
-  { id: 'CB009', name: '储能柜 9' },
-  { id: 'CB010', name: '储能柜 10' },
-  { id: 'CB011', name: '储能柜 11' },
-  { id: 'CB012', name: '储能柜 12' },
-  { id: 'CB013', name: '储能柜 13' },
-  { id: 'CB014', name: '储能柜 14' },
-  { id: 'CB015', name: '储能柜 15' },
-  { id: 'CB016', name: '储能柜 16' },
-  { id: 'CB017', name: '储能柜 17' },
-  { id: 'CB018', name: '储能柜 18' },
-  { id: 'CB019', name: '储能柜 19' },
-  { id: 'CB020', name: '储能柜 20' }
-]);
+/* ================= 基础数据 ================= */
 
-// 选中的储能柜
+const cabinets = ref(
+  Array.from({ length: 20 }, (_, i) => ({
+    id: `CB${i + 1}`,
+    name: `储能柜 ${i + 1}`
+  }))
+);
+
 const selectedCabinet = ref('');
-const selectedCabinetName = computed(() => {
-  const cabinet = cabinets.value.find(c => c.id === selectedCabinet.value);
-  return cabinet ? cabinet.name : '';
-});
-
-// 协商过程步骤
-const processSteps = ['信道探测', '密钥生成', '密钥分发', '密钥提取'];
-
-// 储能柜状态管理
 const cabinetStates = reactive({});
 
-// 当前选中储能柜的状态
-const currentStatus = computed(() => {
-  // 1. 获取当前选中的柜子状态值
-  const status = selectedCabinet.value ? cabinetStates[selectedCabinet.value]?.status : undefined;
-
-  // 2. 严格判定：必须是数字，且在 [0, 4] 闭区间内
-  if (typeof status === 'number' && status >= 0 && status <= 4) {
-    return status;
+/* ================= 工具：确保状态存在 ================= */
+const ensureState = (cabinetId) => {
+  if (!cabinetStates[cabinetId]) {
+    cabinetStates[cabinetId] = {
+      rssiData: [],
+      status: -1
+    };
   }
+  return cabinetStates[cabinetId];
+};
 
-  // 3. 其他所有情况（undefined、超出范围、null 等）均返回 -1
-  return -1;
+/* ================= 计算属性 ================= */
+
+const selectedCabinetName = computed(() => {
+  return cabinets.value.find(c => c.id === selectedCabinet.value)?.name || '';
+});
+
+const processSteps = ['信道探测', '密钥生成', '密钥分发', '密钥提取'];
+
+const currentStatus = computed(() => {
+  return cabinetStates[selectedCabinet.value]?.status ?? -1;
 });
 
 const currentStatusText = computed(() => {
   if (currentStatus.value === -1) return '未开始';
-  if (currentStatus.value < processSteps.length) return processSteps[currentStatus.value];
-  return '完成';
+  if (currentStatus.value >= processSteps.length) return '完成';
+  return processSteps[currentStatus.value];
 });
 
-// 当前选中储能柜的RSSI数据
 const rssiData = computed(() => {
-  return selectedCabinet.value ? (cabinetStates[selectedCabinet.value]?.rssiData || []) : [];
+  return cabinetStates[selectedCabinet.value]?.rssiData || [];
 });
 
-// 图表引用
+/* ================= 图表 ================= */
+
 const chartRef = ref(null);
 let chart = null;
-let timer = null;
+let updateTimer = null;
 
-// 选择储能柜
-const selectCabinet = (cabinetId) => {
-  // 如果点击的是当前柜子直接返回
-  if (selectedCabinet.value === cabinetId) return;
-  selectedCabinet.value = cabinetId;
-  // 初始化数据
-  fetchNegotiationData(cabinetId);
-  // 启动定时任务
-  startTimer(cabinetId);
+const scheduleUpdate = () => {
+  if (updateTimer) return;
+  updateTimer = setTimeout(() => {
+    updateChart();
+    updateTimer = null;
+  }, 200);
 };
 
-// 获取协商数据
-const fetchNegotiationData = async (cabinetId) => {
-  try {
-    cabinetStates[cabinetId] = {};
-    const response = await getCabinetNegotiation(cabinetId);
-    const data = response.data;
-    
-    if (data.code === 0) {
-      cabinetStates[cabinetId].status = data.data.negotiate_status;
-      cabinetStates[cabinetId].rssiData = data.data.rssiData;
-
-      // 如果当前选中的是该储能柜，更新图表
-      if (selectedCabinet.value === cabinetId) {
-        updateChart();
-      }
-    }
-    
-  } catch (error) {
-    console.error('获取协商数据失败:', error);
-  }
-};
-
-// 获取协商状态
-const fetchNegotiationStatus = async (cabinetId) => {
-  try {
-    const response = await getNegotiateStatus(cabinetId);
-    const data = response.data;
-    if (data.code === 0) {
-      // 更新储能柜状态
-      if (!cabinetStates[cabinetId]) {
-        cabinetStates[cabinetId] = {};
-      }
-      cabinetStates[cabinetId].status = data.data;
-      // 当状态为信道探测时，获取RSSI数据
-      if (data.data === 0) {
-        fetchRssiData(cabinetId);
-      }
-    }
-  } catch (error) {
-    console.error('获取协商状态失败:', error);
-  }
-};
-
-// 获取 RSSI 数据
-const fetchRssiData = async (cabinetId) => {
-  try {
-    const response = await getRssiData(cabinetId);
-    const data = response.data;
-    if (data.code === 0) {
-      // 更新储能柜RSSI数据
-      if (!cabinetStates[cabinetId]) {
-        cabinetStates[cabinetId] = {};
-      }
-      cabinetStates[cabinetId].rssiData = data.data;
-      // 如果当前选中的是该储能柜，更新图表
-      if (selectedCabinet.value === cabinetId) {
-        updateChart();
-      }
-    }
-  } catch (error) {
-    console.error('获取 RSSI 数据失败:', error);
-  }
-};
-
-// 启动定时任务
-const startTimer = (cabinetId) => {
-  // 清除之前的定时器
-  if (timer) {
-    clearInterval(timer);
-  }
-  // 每 2 秒获取一次协商数据（同时获取状态和RSSI）
-  timer = setInterval(() => {
-    fetchNegotiationData(cabinetId);
-  }, 2000);
-};
-
-// 更新图表
-const updateChart = () => {
-  // 确保rssiData存在且有值
+const initChart = () => {
   if (!chartRef.value) return;
-  
-  if (!chart) {
-    chart = echarts.init(chartRef.value);
-  }
-  
-  const option = {
-    title: {
-      text: 'RSSI 信号强度',
-      left: 'center'
-    },
-    tooltip: {
-      trigger: 'axis',
-      formatter: function(params) {
-        return `时间点 ${params[0].dataIndex + 1}: ${params[0].value} dBm`;
-      }
-    },
+  if (!chart) chart = echarts.init(chartRef.value);
+};
+
+const updateChart = () => {
+  if (!chartRef.value) return;
+  if (!chart) chart = echarts.init(chartRef.value);
+
+  const data = rssiData.value;
+
+  chart.setOption({
+    title: { text: 'RSSI 信号强度', left: 'center' },
+    tooltip: { trigger: 'axis' },
     xAxis: {
       type: 'category',
-      data: Array.from({ length: rssiData.value.length }, (_, i) => i + 1),
-      name: '时间点'
+      data: data.map((_, i) => i + 1)
     },
-    yAxis: {
-      type: 'value',
-      name: '信号强度 (dBm)',
-      min: Math.min(...rssiData.value) - 5,
-      max: Math.max(...rssiData.value) + 5
-    },
-    series: [{
-      data: rssiData.value,
-      type: 'line',
-      smooth: true,
-      symbol: 'circle',
-      symbolSize: 6,
-      lineStyle: {
-        width: 2
-      },
-      itemStyle: {
-        color: '#409EFF'
-      }
-    }]
-  };
-  
-  chart.setOption(option);
+    yAxis: { type: 'value' },
+    series: [{ data, type: 'line', smooth: true }]
+  });
 };
 
-// 监听窗口大小变化
-const handleResize = () => {
-  if (chart) {
-    chart.resize();
+/* ================= SSE（核心优化） ================= */
+
+let eventSource = null;
+
+const connectSSE = (cabinetId) => {
+  // 关闭旧连接
+  if (eventSource) {
+    eventSource.close();
+    eventSource = null;
   }
+
+  const state = ensureState(cabinetId);
+
+  eventSource = new EventSource(
+    `http://localhost:8000/api/key-negotiate/sse?cabinetId=${cabinetId}`
+  );
+
+  /* ===== RSSI ===== */
+  eventSource.addEventListener('rssi', (e) => {
+    try {
+      const res = JSON.parse(e.data);
+      if (res.code !== 0) return;
+
+      const rssi = res.data;
+      if (typeof rssi !== 'number') return;
+
+      state.rssiData.push(rssi);
+
+      if (state.rssiData.length > 50) {
+        state.rssiData.shift();
+      }
+
+      scheduleUpdate();
+    } catch (err) {
+      console.error('RSSI解析失败', err);
+    }
+  });
+
+  /* ===== STATUS ===== */
+  eventSource.addEventListener('status', (e) => {
+    try {
+      const res = JSON.parse(e.data);
+      if (res.code !== 0) return;
+
+      state.status = res.data;
+
+      // 不再写死 4，改为动态判断
+      if (state.status >= processSteps.length) {
+        ElMessage.success(`${selectedCabinetName.value} 密钥协商完成！`);
+      }
+    } catch (err) {
+      console.error('STATUS解析失败', err);
+    }
+  });
+
+  eventSource.onerror = () => {
+    console.error('SSE 连接异常');
+    eventSource?.close();
+    eventSource = null;
+  };
 };
 
-// 组件挂载
+/* ================= 交互 ================= */
+
+const selectCabinet = async (cabinetId) => {
+  if (selectedCabinet.value === cabinetId) return;
+
+  selectedCabinet.value = cabinetId;
+
+  ensureState(cabinetId);
+
+  await nextTick();
+
+  initChart();
+  updateChart();
+
+  connectSSE(cabinetId);
+};
+
+/* ================= 生命周期 ================= */
+
+const handleResize = () => chart?.resize();
+
 onMounted(() => {
   window.addEventListener('resize', handleResize);
-  // 组件挂载时如果有选中的储能柜，更新图表
-  if (selectedCabinet.value && rssiData.value && rssiData.value.length > 0) {
-    updateChart();
-  }
 });
 
-// 组件激活时
-onActivated(() => {
-  // 组件激活时重新初始化图表
-  if (chart) {
-    chart.dispose();
-    chart = null;
-  }
-  // 如果有选中的储能柜，更新图表
-  if (selectedCabinet.value && rssiData.value && rssiData.value.length > 0) {
-    updateChart();
-  }
-});
-
-// 组件卸载
 onUnmounted(() => {
-  if (timer) {
-    clearInterval(timer);
-  }
-  if (chart) {
-    chart.dispose();
-  }
+  eventSource?.close();
+  chart?.dispose();
   window.removeEventListener('resize', handleResize);
 });
 
-// 监听 RSSI 数据变化
-watch(rssiData, () => {
-  updateChart();
-});
+watch(rssiData, scheduleUpdate);
 
-// 获取状态标签类型
+/* ================= UI ================= */
+
 const getStatusType = () => {
   if (currentStatus.value === -1) return 'info';
-  if (currentStatus.value < processSteps.length) return 'primary';
-  return 'success';
+  if (currentStatus.value >= processSteps.length) return 'success';
+  return 'primary';
 };
 </script>
 

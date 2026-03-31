@@ -51,10 +51,7 @@ const handleClose = (key, keyPath) => {
                     <span>主面板</span>
                 </el-menu-item>
 
-                <el-menu-item index="/module/auth">
-                    <el-icon><OfficeBuilding /></el-icon>
-                    <span>设备认证</span>
-                </el-menu-item>
+
 
                 <el-menu-item index="/module/key-negotiation">
                     <el-icon><Promotion /></el-icon>
@@ -71,6 +68,7 @@ const handleClose = (key, keyPath) => {
                     <el-menu-item index="/module/collect"><el-icon><DataLine /></el-icon>信号采集</el-menu-item>
                     <el-menu-item index="/module/key-manage"><el-icon><Key /></el-icon>秘钥管理</el-menu-item>
                     <el-menu-item index="/module/encrypt"><el-icon><Message /></el-icon>数据包加密</el-menu-item>
+                    <el-menu-item index="/module/auth"><el-icon><OfficeBuilding /></el-icon>设备日志</el-menu-item>
                     <el-menu-item index="/module/log"><el-icon><Notebook /></el-icon>日志管理</el-menu-item>
                     <!-- <el-menu-item index="/module/test">测试</el-menu-item> -->
                 </el-sub-menu>
