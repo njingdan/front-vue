@@ -1,71 +1,102 @@
-<template>
+﻿<template>
   <div class="key-negotiation-container">
     <div class="page-header">
       <h1>储能柜密钥协商</h1>
     </div>
 
-    <div class="main-content">
-      <!-- 柜子列表 -->
-      <el-card class="stat-card cabinet-list-card">
-        <div class="card-header">
-          <h2>储能柜列表</h2>
-        </div>
+    <div class="content-layout">
+      <div class="main-content">
+        <!-- 柜子列表 -->
+        <el-card class="stat-card cabinet-list-card">
+          <div class="card-header">
+            <h2>储能柜列表</h2>
+          </div>
 
-        <div class="cabinet-list">
-          <el-button
-            v-for="cabinet in cabinets"
-            :key="cabinet.id"
-            :type="selectedCabinet === cabinet.id ? 'primary' : 'default'"
-            @click="selectCabinet(cabinet.id)"
-          >
-            {{ cabinet.name }}
-          </el-button>
-        </div>
-      </el-card>
+          <div class="cabinet-list">
+            <el-button
+              v-for="cabinet in cabinets"
+              :key="cabinet.id"
+              :type="selectedCabinet === cabinet.id ? 'primary' : 'default'"
+              @click="selectCabinet(cabinet.id)"
+            >
+              {{ cabinet.name }}
+            </el-button>
+          </div>
+        </el-card>
 
-      <!-- 协商过程 -->
-      <el-card v-if="selectedCabinet" class="stat-card negotiation-process-card">
-        <div class="card-header">
-          <h2>{{ selectedCabinetName }} 密钥协商过程</h2>
-          <el-tag :type="getStatusType()">
-            {{ currentStatusText }}
-          </el-tag>
-        </div>
+        <!-- 协商过程 -->
+        <el-card v-if="selectedCabinet" class="stat-card negotiation-process-card">
+          <div class="card-header">
+            <h2>{{ selectedCabinetName }} 密钥协商过程</h2>
+            <el-tag :type="getStatusType()">
+              {{ currentStatusText }}
+            </el-tag>
+          </div>
 
-        <!-- 阶段 -->
-        <div class="stage-indicators">
-          <div
-            class="stage-line"
-            :style="{ width: `${(currentStatus + 1) / processSteps.length * 100}%` }"
-          ></div>
+          <!-- 阶段 -->
+          <div class="stage-indicators">
+            <div
+              class="stage-line"
+              :style="{ width: `${(currentStatus + 1) / processSteps.length * 100}%` }"
+            ></div>
 
-          <div
-            v-for="(step, index) in processSteps"
-            :key="index"
-            class="stage-indicator"
-            :class="{
-              completed: currentStatus >= index,
-              active: currentStatus === index
-            }"
-          >
-            <div class="stage-icon">
-              <el-icon v-if="currentStatus >= index"><Check /></el-icon>
-              <el-icon v-else><Loading /></el-icon>
+            <div
+              v-for="(step, index) in processSteps"
+              :key="index"
+              class="stage-indicator"
+              :class="{
+                completed: currentStatus >= index,
+                active: currentStatus === index
+              }"
+            >
+              <div class="stage-icon">
+                <el-icon v-if="currentStatus >= index"><Check /></el-icon>
+                <el-icon v-else><Loading /></el-icon>
+              </div>
+              <div class="stage-name">{{ step }}</div>
             </div>
-            <div class="stage-name">{{ step }}</div>
+          </div>
+
+          <!-- 图表 -->
+          <div class="rssi-chart">
+            <el-divider content-position="left">RSSI 数据曲线</el-divider>
+            <div ref="chartRef" class="chart-container"></div>
+          </div>
+        </el-card>
+
+        <div v-else class="no-selection">
+          <el-empty description="请选择一个储能柜查看密钥协商过程" />
+        </div>
+      </div>
+
+      <!-- 右侧边栏：选中储能柜日志 -->
+      <el-card class="stat-card cabinet-sidebar-card">
+        <div class="card-header">
+          <h2>储能柜日志</h2>
+        </div>
+
+        <div v-if="selectedCabinet" class="cabinet-sidebar-list">
+          <div class="selected-cabinet-title">{{ selectedCabinetName }} 最近10条日志</div>
+
+          <el-empty v-if="selectedCabinetLogs.length === 0" description="暂无日志数据" />
+
+          <div v-else class="cabinet-log-list">
+            <div
+              v-for="log in selectedCabinetLogs"
+              :key="`${log.timestamp}-${log.step}-${log.info}`"
+              class="cabinet-log-item"
+            >
+              <div class="cabinet-log-time">{{ formatTimestamp(log.timestamp) }}</div>
+              <div class="cabinet-log-step">{{ log.step }}</div>
+              <div class="cabinet-log-info">{{ log.info }}</div>
+            </div>
           </div>
         </div>
 
-        <!-- 图表 -->
-        <div class="rssi-chart">
-          <el-divider content-position="left">RSSI 数据曲线</el-divider>
-          <div ref="chartRef" class="chart-container"></div>
+        <div v-else class="sidebar-empty-wrap">
+          <el-empty description="请选择左侧储能柜查看日志" />
         </div>
       </el-card>
-
-      <div v-else class="no-selection">
-        <el-empty description="请选择一个储能柜查看密钥协商过程" />
-      </div>
     </div>
   </div>
 </template>
@@ -83,18 +114,20 @@ import {
 import * as echarts from 'echarts';
 import { Check, Loading } from '@element-plus/icons-vue';
 import { ElMessage } from 'element-plus';
+import { get, getServerUrl } from '../axios/request';
 
 /* ================= 基础数据 ================= */
 
 const cabinets = ref(
   Array.from({ length: 20 }, (_, i) => ({
     id: `CB${i + 1}`,
-    name: `储能柜 ${i + 1}`
+    name: `储能柜${i + 1}`
   }))
 );
 
 const selectedCabinet = ref('');
 const cabinetStates = reactive({});
+const selectedCabinetLogs = ref([]);
 
 /* ================= 工具：确保状态存在 ================= */
 const ensureState = (cabinetId) => {
@@ -110,7 +143,7 @@ const ensureState = (cabinetId) => {
 /* ================= 计算属性 ================= */
 
 const selectedCabinetName = computed(() => {
-  return cabinets.value.find(c => c.id === selectedCabinet.value)?.name || '';
+  return cabinets.value.find((c) => c.id === selectedCabinet.value)?.name || '';
 });
 
 const processSteps = ['信道探测', '密钥生成', '密钥分发', '密钥提取'];
@@ -119,11 +152,19 @@ const currentStatus = computed(() => {
   return cabinetStates[selectedCabinet.value]?.status ?? -1;
 });
 
-const currentStatusText = computed(() => {
-  if (currentStatus.value === -1) return '未开始';
-  if (currentStatus.value >= processSteps.length) return '完成';
-  return processSteps[currentStatus.value];
-});
+const getStatusTextByValue = (status) => {
+  if (status === -1) return '未开始';
+  if (status >= processSteps.length) return '完成';
+  return processSteps[status] || `阶段${status}`;
+};
+
+const getStatusTypeByValue = (status) => {
+  if (status === -1) return 'info';
+  if (status >= processSteps.length) return 'success';
+  return 'primary';
+};
+
+const currentStatusText = computed(() => getStatusTextByValue(currentStatus.value));
 
 const rssiData = computed(() => {
   return cabinetStates[selectedCabinet.value]?.rssiData || [];
@@ -166,24 +207,28 @@ const updateChart = () => {
   });
 };
 
-/* ================= SSE（核心优化） ================= */
+/* ================= SSE（当前选中柜实时） ================= */
 
 let eventSource = null;
 
-const connectSSE = (cabinetId) => {
-  // 关闭旧连接
+const getCabinetName = (cabinetId) => {
+  return cabinets.value.find((c) => c.id === cabinetId)?.name || cabinetId;
+};
+
+const connectCabinetSSE = (cabinetId) => {
+  if (!cabinetId) return;
+
   if (eventSource) {
     eventSource.close();
     eventSource = null;
   }
 
   const state = ensureState(cabinetId);
-
+  const serverBase = getServerUrl().replace(/\/$/, '');
   eventSource = new EventSource(
-    `http://localhost:8000/api/key-negotiate/sse?cabinetId=${cabinetId}`
+    `${serverBase}/api/key-negotiate/sse?cabinetId=${encodeURIComponent(cabinetId)}`
   );
 
-  /* ===== RSSI ===== */
   eventSource.addEventListener('rssi', (e) => {
     try {
       const res = JSON.parse(e.data);
@@ -193,39 +238,64 @@ const connectSSE = (cabinetId) => {
       if (typeof rssi !== 'number') return;
 
       state.rssiData.push(rssi);
-
-      if (state.rssiData.length > 50) {
-        state.rssiData.shift();
-      }
-
+      if (state.rssiData.length > 50) state.rssiData.shift();
       scheduleUpdate();
     } catch (err) {
-      console.error('RSSI解析失败', err);
+      console.error('RSSI parse failed', err);
     }
   });
 
-  /* ===== STATUS ===== */
   eventSource.addEventListener('status', (e) => {
     try {
       const res = JSON.parse(e.data);
       if (res.code !== 0) return;
 
+      const prevStatus = state.status;
       state.status = res.data;
 
-      // 不再写死 4，改为动态判断
-      if (state.status >= processSteps.length) {
-        ElMessage.success(`${selectedCabinetName.value} 密钥协商完成！`);
+      if (prevStatus < processSteps.length && state.status >= processSteps.length) {
+        ElMessage.success(`${getCabinetName(cabinetId)} 密钥协商完成`);
       }
     } catch (err) {
-      console.error('STATUS解析失败', err);
+      console.error('STATUS parse failed', err);
+    }
+  });
+
+  eventSource.addEventListener('log', (e) => {
+    try {
+      const res = JSON.parse(e.data);
+      if (res.code !== 0) return;
+      const logItem = res.data;
+      if (logItem?.flag !== 1) return;
+      selectedCabinetLogs.value = [logItem, ...selectedCabinetLogs.value]
+        .sort((a, b) => Number(b.timestamp) - Number(a.timestamp))
+        .slice(0, 10);
+    } catch (err) {
+      console.error('LOG parse failed', err);
     }
   });
 
   eventSource.onerror = () => {
-    console.error('SSE 连接异常');
     eventSource?.close();
     eventSource = null;
   };
+};
+
+const fetchSelectedCabinetLogs = async (cabinetId) => {
+  try {
+    const resp = await get('/api/key-negotiate/log', { cabinetId, flag: 1 });
+    if (resp?.data?.code !== 0 || !Array.isArray(resp?.data?.data)) {
+      selectedCabinetLogs.value = [];
+      return;
+    }
+    selectedCabinetLogs.value = resp.data.data
+      .slice()
+      .sort((a, b) => Number(b.timestamp) - Number(a.timestamp))
+      .slice(0, 10);
+  } catch (err) {
+    selectedCabinetLogs.value = [];
+    console.error('fetch selected logs failed', err);
+  }
 };
 
 /* ================= 交互 ================= */
@@ -234,15 +304,15 @@ const selectCabinet = async (cabinetId) => {
   if (selectedCabinet.value === cabinetId) return;
 
   selectedCabinet.value = cabinetId;
-
   ensureState(cabinetId);
+  await fetchSelectedCabinetLogs(cabinetId);
 
   await nextTick();
 
   initChart();
   updateChart();
 
-  connectSSE(cabinetId);
+  connectCabinetSSE(cabinetId);
 };
 
 /* ================= 生命周期 ================= */
@@ -255,6 +325,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   eventSource?.close();
+  eventSource = null;
   chart?.dispose();
   window.removeEventListener('resize', handleResize);
 });
@@ -263,10 +334,12 @@ watch(rssiData, scheduleUpdate);
 
 /* ================= UI ================= */
 
-const getStatusType = () => {
-  if (currentStatus.value === -1) return 'info';
-  if (currentStatus.value >= processSteps.length) return 'success';
-  return 'primary';
+const getStatusType = () => getStatusTypeByValue(currentStatus.value);
+
+const formatTimestamp = (timestamp) => {
+  const ts = Number(timestamp);
+  if (!Number.isFinite(ts) || ts <= 0) return '--';
+  return new Date(ts).toLocaleString('zh-CN', { hour12: false });
 };
 </script>
 
@@ -290,12 +363,20 @@ const getStatusType = () => {
   color: #333;
 }
 
+.content-layout {
+  display: flex;
+  gap: 20px;
+  max-width: 1600px;
+  margin: 0 auto;
+  align-items: flex-start;
+}
+
 .main-content {
+  flex: 1;
+  min-width: 0;
   gap: 20px;
   display: flex;
   flex-direction: column;
-  max-width: 1200px;
-  margin: 0 auto;
 }
 
 /* 卡片样式 */
@@ -334,18 +415,17 @@ const getStatusType = () => {
 }
 
 .cabinet-list .el-button {
-  width: 100%;       /* 强制按钮宽度撑满 grid 单元格的 120px+ */
-  margin-left: 0;    /* 彻底消除 Element 按钮默认的左边距（这是主因） */
+  width: 100%;
+  margin-left: 0;
   margin-right: 0;
-  padding-left: 10px; /* 如果内容太长，确保左右内边距对称 */
+  padding-left: 10px;
   padding-right: 10px;
-  display: flex;     /* 确保按钮文字居中 */
+  display: flex;
   justify-content: center;
 }
 
-/* 兼容 Element Plus 的间距重置 */
 .cabinet-list .el-button + .el-button {
-  margin-left: 0;    /* 覆盖 Element 默认的 .el-button + .el-button 样式 */
+  margin-left: 0;
 }
 
 /* 协商过程样式 */
@@ -356,7 +436,7 @@ const getStatusType = () => {
 /* 阶段指示器样式 */
 .stage-indicators {
   display: flex;
-  justify-content:space-around;
+  justify-content: space-around;
   position: relative;
   margin: 30px 20px;
   padding: 0 10px;
@@ -367,7 +447,7 @@ const getStatusType = () => {
   top: 16px;
   left: 30px;
   height: 2px;
-  background-color: #409EFF;
+  background-color: #409eff;
   z-index: 1;
   transition: width 0.3s;
 }
@@ -439,7 +519,7 @@ const getStatusType = () => {
   margin-top: 10px;
 }
 
-/* 未选择储能柜样式 */
+/* 未选择样式 */
 .no-selection {
   padding: 100px 0;
   text-align: center;
@@ -448,34 +528,106 @@ const getStatusType = () => {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
+/* 右侧边栏 */
+.cabinet-sidebar-card {
+  width: 360px;
+  max-height: calc(100vh - 120px);
+  position: sticky;
+  top: 20px;
+}
+
+.cabinet-sidebar-list {
+  padding: 12px;
+  max-height: calc(100vh - 200px);
+  overflow-y: auto;
+}
+
+.selected-cabinet-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #303133;
+  margin-bottom: 12px;
+}
+
+.sidebar-empty-wrap {
+  padding: 20px 12px;
+}
+
+.cabinet-log-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.cabinet-log-item {
+  border: 1px solid #ebeef5;
+  border-radius: 8px;
+  padding: 10px;
+  background-color: #fafafa;
+}
+
+.cabinet-log-time {
+  font-size: 12px;
+  color: #909399;
+  margin-bottom: 6px;
+}
+
+.cabinet-log-step {
+  font-size: 13px;
+  color: #303133;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.cabinet-log-info {
+  font-size: 12px;
+  color: #606266;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
 /* 响应式设计 */
 @media (max-width: 768px) {
+  .content-layout {
+    flex-direction: column;
+  }
+
+  .cabinet-sidebar-card {
+    width: 100%;
+    max-height: none;
+    position: static;
+  }
+
+  .cabinet-sidebar-list {
+    max-height: none;
+  }
+
   .stage-indicators {
     flex-direction: column;
     align-items: flex-start;
     margin: 20px;
   }
-  
+
   .stage-indicators::before,
   .stage-line {
     display: none;
   }
-  
+
   .stage-indicator {
     flex-direction: row;
     width: 100%;
     margin-bottom: 15px;
   }
-  
+
   .stage-icon {
     margin-bottom: 0;
     margin-right: 10px;
   }
-  
+
   .stage-name {
     text-align: left;
   }
-  
+
   .cabinet-list {
     grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
   }
