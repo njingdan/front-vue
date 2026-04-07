@@ -1,495 +1,549 @@
 <template>
-  <div class="upload-test-container">
-    <h1>信号文件上传测试</h1>
-    
-    <!-- 文件选择区域 -->
-    <div class="file-selection">
-      <h2>1. 选择文件</h2>
-      <input type="file" ref="fileInput" @change="handleFileSelect" />
-      <div v-if="selectedFile" class="file-info">
-        <p>文件名: {{ selectedFile.name }}</p>
-        <p>文件大小: {{ formatFileSize(selectedFile.size) }}</p>
-      </div>
-    </div>
-    
-    <!-- 上传控制区域 -->
-    <div class="upload-controls">
-      <h2>2. 上传选项</h2>
-      <div class="button-group">
-        <button 
-          @click="uploadCompleteFile" 
-          :disabled="!selectedFile || isUploading"
-          class="btn btn-primary"
-        >
-          完整上传
-        </button>
-        <button 
-          @click="uploadChunkedFile" 
-          :disabled="!selectedFile || isUploading"
-          class="btn btn-success"
-        >
-          分片上传
-        </button>
-        <button 
-          @click="checkUploadProgress" 
-          :disabled="!uploadId"
-          class="btn btn-info"
-        >
-          检查进度
-        </button>
-        <button 
-          @click="completeUpload" 
-          :disabled="!uploadId"
-          class="btn btn-warning"
-        >
-          完成上传
-        </button>
-      </div>
-    </div>
-    
-    <!-- 上传进度区域 -->
-    <div class="upload-progress" v-if="isUploading || uploadProgress > 0">
-      <h2>3. 上传进度</h2>
-      <div class="progress-bar">
-        <div 
-          class="progress-fill" 
-          :style="{ width: uploadProgress + '%' }"
-        ></div>
-      </div>
-      <p class="progress-text">{{ uploadStatus }}</p>
-    </div>
-    
-    <!-- 实时数据展示区域 -->
-    <div class="realtime-data">
-      <h2>4. 实时波形数据</h2>
-      <div class="waveform-container">
-        <canvas ref="waveformCanvas" width="800" height="300"></canvas>
-      </div>
-      <p class="data-status" v-if="waveformData">
-        接收数据点: {{ waveformData.magnitude?.length || 0 }}
-      </p>
-    </div>
-    
-    <!-- 操作日志区域 -->
-    <div class="operation-log">
-      <h2>5. 操作日志</h2>
-      <div class="log-container">
-        <div v-for="(log, index) in logs" :key="index" class="log-item">
-          <span class="log-time">{{ log.time }}</span>
-          <span class="log-message">{{ log.message }}</span>
+  <div class="upload-test-page">
+    <section class="panel">
+      <header class="panel-header">
+        <h1>Signal Upload Test</h1>
+        <p>用于手动触发分片上传并观察后端解析与波形推送状态。</p>
+      </header>
+
+      <div class="grid">
+        <label class="field">
+          <span>选择文件</span>
+          <input type="file" accept=".bin,application/octet-stream" @change="handleFileChange" />
+        </label>
+
+        <div class="field">
+          <span>上传 ID</span>
+          <strong>{{ uploadId || '--' }}</strong>
+        </div>
+
+        <div class="field">
+          <span>分片大小</span>
+          <strong>{{ formatSize(chunkSizeBytes) }}</strong>
+        </div>
+
+        <div class="field">
+          <span>已上传分片</span>
+          <strong>{{ uploadedChunks }} / {{ totalChunks }}</strong>
         </div>
       </div>
-    </div>
+
+      <div v-if="selectedFile" class="file-summary">
+        <span>文件: {{ selectedFile.name }}</span>
+        <span>大小: {{ formatSize(selectedFile.size) }}</span>
+      </div>
+
+      <div class="actions">
+        <button class="btn primary" :disabled="!selectedFile || isUploading" @click="startChunkUpload">
+          {{ isUploading ? '上传中...' : '开始分片上传' }}
+        </button>
+        <button class="btn secondary" :disabled="!uploadId || isUploading" @click="queryUploadProgress">
+          查询上传进度
+        </button>
+        <button class="btn ghost" @click="clearLogs">清空日志</button>
+      </div>
+
+      <div class="progress-wrap">
+        <div class="progress-head">
+          <span>{{ uploadStatus }}</span>
+          <strong>{{ uploadProgress }}%</strong>
+        </div>
+        <div class="track">
+          <div class="fill" :style="{ width: `${uploadProgress}%` }"></div>
+        </div>
+      </div>
+
+      <div class="parser-status">
+        <span>解析中: {{ activeUploadId || '--' }}</span>
+        <span>排队数: {{ pendingQueueSize }}</span>
+        <span>SSE 状态: {{ playbackState }}</span>
+      </div>
+    </section>
+
+    <section class="panel chart-panel">
+      <div class="chart-head">
+        <h2>实时波形</h2>
+        <span>{{ latestTimestampText }}</span>
+      </div>
+      <WaveformChart :waveform="waveform" :playback-state="playbackState" :transition-ms="40" />
+    </section>
+
+    <section class="panel">
+      <h3>操作日志</h3>
+      <div class="logs">
+        <div v-for="(log, index) in logs" :key="index" class="log-item">
+          <span class="time">{{ log.time }}</span>
+          <span class="message">{{ log.message }}</span>
+        </div>
+        <p v-if="!logs.length" class="empty-log">暂无日志</p>
+      </div>
+    </section>
   </div>
 </template>
 
-<script>
-import axios from 'axios';
+<script setup>
+import { computed, onMounted, onUnmounted, ref } from 'vue'
+import WaveformChart from '@/components/WaveformChart.vue'
+import {
+  completeSignalUpload,
+  fetchSignalParserStatus,
+  fetchSignalUploadProgress,
+  subscribeWaveform,
+  uploadSignalChunk
+} from '@/api/signal'
 
-export default {
-  name: 'SignalUploadTest',
-  data() {
-    return {
-      selectedFile: null,
-      isUploading: false,
-      uploadProgress: 0,
-      uploadStatus: '',
-      uploadId: localStorage.getItem('uploadId') || null,
-      chunkSize: 2 * 50 * 1024 * 1024, // 2MB 分片
-      logs: [],
-      waveformData: null,
-      eventSource: null
-    };
-  },
-  mounted() {
-    this.initSSE();
-    this.log('页面已加载');
-  },
-  beforeUnmount() {
-    if (this.eventSource) {
-      this.eventSource.close();
-    }
-  },
-  methods: {
-    // 处理文件选择
-    handleFileSelect(event) {
-      const file = event.target.files[0];
-      if (file) {
-        this.selectedFile = file;
-        this.log(`文件选择: ${file.name} (${this.formatFileSize(file.size)})`);
-      }
-    },
-    
-    // 格式化文件大小
-    formatFileSize(bytes) {
-      if (bytes === 0) return '0 B';
-      const k = 1024;
-      const sizes = ['B', 'KB', 'MB', 'GB'];
-      const i = Math.floor(Math.log(bytes) / Math.log(k));
-      return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-    },
-    
-    // 完整上传
-    async uploadCompleteFile() {
-      if (!this.selectedFile) return;
-      
-      this.isUploading = true;
-      this.uploadProgress = 0;
-      this.uploadStatus = '开始上传...';
-      this.log('开始完整上传');
-      
-      try {
-        const formData = new FormData();
-        formData.append('file', this.selectedFile);
-        
-        const response = await axios.post('http://localhost:8000/api/signal/upload', formData, {
-          headers: {
-            'Content-Type': 'multipart/form-data'
-          },
-          onUploadProgress: (progressEvent) => {
-            this.uploadProgress = Math.round((progressEvent.loaded / progressEvent.total) * 100);
-            this.uploadStatus = `上传中: ${this.uploadProgress}%`;
-          }
-        });
-        
-        this.uploadStatus = '上传成功!';
-        this.log(`完整上传成功: ${response.data.message}`);
-      } catch (error) {
-        this.uploadStatus = '上传失败!';
-        this.log(`完整上传失败: ${error.message}`);
-      } finally {
-        this.isUploading = false;
-      }
-    },
-    
-    // 分片上传
-    async uploadChunkedFile() {
-      if (!this.selectedFile) return;
-      
-      this.isUploading = true;
-      this.uploadProgress = 0;
-      this.uploadStatus = '准备分片上传...';
-      
-      // 生成或使用现有 uploadId
-      if (!this.uploadId) {
-        this.uploadId = 'upload_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-        localStorage.setItem('uploadId', this.uploadId);
-      }
-      
-      const fileSize = this.selectedFile.size;
-      const totalChunks = Math.ceil(fileSize / this.chunkSize);
-      
-      this.log(`开始分片上传: ${totalChunks} 个分片`);
-      
-      try {
-        // 检查上传进度
-        await this.checkUploadProgress();
-        
-        // 上传分片
-        for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
-          const start = chunkIndex * this.chunkSize;
-          const end = Math.min(start + this.chunkSize, fileSize);
-          const chunk = this.selectedFile.slice(start, end);
-          
-          this.uploadStatus = `上传分片 ${chunkIndex + 1}/${totalChunks}`;
-          this.uploadProgress = Math.round((start / fileSize) * 100);
-          
-          const formData = new FormData();
-          formData.append('uploadId', this.uploadId);
-          formData.append('chunkIndex', chunkIndex);
-          formData.append('totalChunks', totalChunks);
-          formData.append('offset', start);
-          formData.append('file', chunk);
-          
-          const response = await axios.post('http://localhost:8000/api/signal/upload/chunk', formData, {
-            headers: {
-              'Content-Type': 'multipart/form-data'
-            }
-          });
-          
-          this.log(`分片 ${chunkIndex} 上传成功: ${response.data.message}`);
-        }
-        
-        // 完成上传
-        await this.completeUpload();
-        
-        this.uploadStatus = '分片上传成功!';
-        this.uploadProgress = 100;
-        this.log('分片上传完成');
-      } catch (error) {
-        this.uploadStatus = '分片上传失败!';
-        this.log(`分片上传失败: ${error.message}`);
-      } finally {
-        this.isUploading = false;
-      }
-    },
-    
-    // 检查上传进度
-    async checkUploadProgress() {
-      if (!this.uploadId) return;
-      
-      try {
-        const response = await axios.get(`http://localhost:8000/api/signal/upload/progress?uploadId=${this.uploadId}`);
-        const progress = response.data.data;
-        
-        this.log(`上传进度: ${progress.receivedChunks.size} 个分片已上传, 当前偏移: ${progress.currentOffset}`);
-        return progress;
-      } catch (error) {
-        this.log(`检查进度失败: ${error.message}`);
-        return null;
-      }
-    },
-    
-    // 完成上传
-    async completeUpload() {
-      if (!this.uploadId) return;
-      
-      try {
-        const response = await axios.post(`http://localhost:8000/api/signal/upload/complete?uploadId=${this.uploadId}`);
-        this.log(`上传完成: ${response.data.message}`);
-        
-        // 清除 uploadId
-        this.uploadId = null;
-        localStorage.removeItem('uploadId');
-      } catch (error) {
-        this.log(`完成上传失败: ${error.message}`);
-      }
-    },
-    
-    // 初始化 SSE 连接
-    initSSE() {
-      try {
-        this.eventSource = new EventSource('http://localhost:8000/api/signal/stream');
-        
-        this.eventSource.onmessage = (event) => {
-          try {
-            const data = JSON.parse(event.data);
-            this.waveformData = data;
-            this.drawWaveform();
-          } catch (error) {
-            this.log(`解析 SSE 数据失败: ${error.message}`);
-          }
-        };
-        
-        this.eventSource.onerror = (error) => {
-          this.log(`SSE 连接错误: ${error}`);
-          // 尝试重连
-          setTimeout(() => this.initSSE(), 5000);
-        };
-        
-        this.log('SSE 连接已建立');
-      } catch (error) {
-        this.log(`SSE 连接失败: ${error.message}`);
-      }
-    },
-    
-    // 绘制波形
-    drawWaveform() {
-      const canvas = this.$refs.waveformCanvas;
-      if (!canvas || !this.waveformData || !this.waveformData.magnitude) return;
-      
-      const ctx = canvas.getContext('2d');
-      const width = canvas.width;
-      const height = canvas.height;
-      const data = this.waveformData.magnitude;
-      
-      // 清空画布
-      ctx.clearRect(0, 0, width, height);
-      
-      // 绘制波形
-      ctx.beginPath();
-      ctx.moveTo(0, height / 2);
-      
-      for (let i = 0; i < data.length; i++) {
-        const x = (i / data.length) * width;
-        const y = height / 2 - (data[i] * height / 4); // 缩放数据
-        ctx.lineTo(x, y);
-      }
-      
-      ctx.strokeStyle = '#4CAF50';
-      ctx.lineWidth = 2;
-      ctx.stroke();
-    },
-    
-    // 记录日志
-    log(message) {
-      const time = new Date().toLocaleTimeString();
-      this.logs.unshift({ time, message });
-      // 限制日志数量
-      if (this.logs.length > 50) {
-        this.logs.pop();
-      }
-    }
+const chunkSizeBytes = 2 * 1024 * 1024
+
+const createEmptyWaveform = () => ({
+  real: [],
+  imaginary: [],
+  amplitudes: [],
+  timestamp: null,
+  type: 'IDLE'
+})
+
+const selectedFile = ref(null)
+const uploadId = ref('')
+const isUploading = ref(false)
+const uploadProgress = ref(0)
+const uploadStatus = ref('等待上传')
+const uploadedChunks = ref(0)
+const totalChunks = ref(0)
+
+const waveform = ref(createEmptyWaveform())
+const playbackState = ref('idle')
+const latestTimestamp = ref(null)
+const pendingQueueSize = ref(0)
+const activeUploadId = ref('')
+
+const logs = ref([])
+
+let eventSource = null
+let parserStatusTimer = null
+let reconnectTimer = null
+
+const appendLog = (message) => {
+  const now = new Date().toLocaleTimeString()
+  logs.value.unshift({ time: now, message })
+  if (logs.value.length > 120) {
+    logs.value.length = 120
   }
-};
+}
+
+const clearLogs = () => {
+  logs.value = []
+}
+
+const normalizeWaveform = (payload) => {
+  const raw = payload?.data ?? payload ?? {}
+  const parseSeries = (series) =>
+    Array.isArray(series)
+      ? series.map((item) => Number(item)).filter((item) => Number.isFinite(item))
+      : []
+
+  return {
+    real: parseSeries(raw.real),
+    imaginary: parseSeries(raw.imaginary),
+    amplitudes: parseSeries(raw.amplitudes),
+    timestamp: raw.timestamp ?? Date.now(),
+    type: raw.type ?? 'REALTIME'
+  }
+}
+
+const formatSize = (bytes) => {
+  if (!bytes || bytes <= 0) {
+    return '0 B'
+  }
+  const units = ['B', 'KB', 'MB', 'GB']
+  let value = bytes
+  let unitIndex = 0
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024
+    unitIndex += 1
+  }
+  return `${value.toFixed(value >= 100 || unitIndex === 0 ? 0 : 2)} ${units[unitIndex]}`
+}
+
+const createUploadId = () => `upload_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`
+
+const handleFileChange = (event) => {
+  const file = event.target.files?.[0] || null
+  selectedFile.value = file
+  if (!file) {
+    return
+  }
+  totalChunks.value = Math.max(1, Math.ceil(file.size / chunkSizeBytes))
+  uploadId.value = createUploadId()
+  uploadProgress.value = 0
+  uploadedChunks.value = 0
+  uploadStatus.value = '文件已选择，等待上传'
+  appendLog(`已选择文件: ${file.name}, 分片数: ${totalChunks.value}`)
+}
+
+const parseResponseData = (response) => response?.data?.data ?? response?.data ?? null
+
+const queryUploadProgress = async () => {
+  if (!uploadId.value) {
+    return
+  }
+
+  try {
+    const response = await fetchSignalUploadProgress(uploadId.value)
+    const progress = parseResponseData(response) || {}
+    const receivedChunks = Array.isArray(progress.receivedChunks)
+      ? progress.receivedChunks.length
+      : progress.receivedChunks?.length || 0
+
+    uploadedChunks.value = receivedChunks
+    totalChunks.value = progress.totalChunks || totalChunks.value
+    pendingQueueSize.value = Number(progress.pendingQueueSize) || pendingQueueSize.value
+    activeUploadId.value = progress.activeUploadId || activeUploadId.value
+
+    appendLog(
+      `上传进度: ${receivedChunks}/${totalChunks.value}, queued=${Boolean(progress.queuedForParsing)}, completed=${Boolean(progress.completed)}`
+    )
+  } catch (error) {
+    appendLog(`查询进度失败: ${error?.message || 'unknown error'}`)
+  }
+}
+
+const refreshParserStatus = async () => {
+  try {
+    const response = await fetchSignalParserStatus()
+    const parser = parseResponseData(response) || {}
+    pendingQueueSize.value = Number(parser.pendingQueueSize) || 0
+    activeUploadId.value = parser.activeUploadId || ''
+  } catch (error) {
+    appendLog(`获取解析状态失败: ${error?.message || 'unknown error'}`)
+  }
+}
+
+const startChunkUpload = async () => {
+  if (!selectedFile.value || isUploading.value) {
+    return
+  }
+
+  if (!uploadId.value) {
+    uploadId.value = createUploadId()
+  }
+
+  const file = selectedFile.value
+  totalChunks.value = Math.max(1, Math.ceil(file.size / chunkSizeBytes))
+  uploadedChunks.value = 0
+  uploadProgress.value = 0
+  uploadStatus.value = '开始上传分片...'
+  isUploading.value = true
+
+  appendLog(`开始上传: uploadId=${uploadId.value}, totalChunks=${totalChunks.value}`)
+
+  try {
+    for (let chunkIndex = 0; chunkIndex < totalChunks.value; chunkIndex += 1) {
+      const start = chunkIndex * chunkSizeBytes
+      const end = Math.min(start + chunkSizeBytes, file.size)
+      const chunk = file.slice(start, end)
+
+      await uploadSignalChunk({
+        uploadId: uploadId.value,
+        chunkIndex,
+        totalChunks: totalChunks.value,
+        offset: start,
+        fileName: file.name,
+        chunk
+      })
+
+      uploadedChunks.value = chunkIndex + 1
+      uploadProgress.value = Math.round((uploadedChunks.value / totalChunks.value) * 100)
+      uploadStatus.value = `上传分片 ${uploadedChunks.value}/${totalChunks.value}`
+
+      if ((chunkIndex + 1) % 10 === 0 || chunkIndex + 1 === totalChunks.value) {
+        appendLog(`分片上传进度: ${uploadedChunks.value}/${totalChunks.value}`)
+      }
+    }
+
+    const completeResponse = await completeSignalUpload(uploadId.value)
+    const completeData = parseResponseData(completeResponse)
+    uploadStatus.value = `上传完成: ${completeData || 'QUEUED'}`
+    appendLog(`complete 接口返回: ${completeData || 'QUEUED'}`)
+
+    await refreshParserStatus()
+  } catch (error) {
+    uploadStatus.value = '上传失败'
+    appendLog(`上传失败: ${error?.response?.data?.message || error?.message || 'unknown error'}`)
+  } finally {
+    isUploading.value = false
+  }
+}
+
+const closeWaveformStream = () => {
+  if (eventSource) {
+    eventSource.close()
+    eventSource = null
+  }
+}
+
+const connectWaveformStream = () => {
+  closeWaveformStream()
+  eventSource = subscribeWaveform({
+    onOpen: () => {
+      playbackState.value = 'queued'
+      appendLog('SSE 已连接')
+    },
+    onSignal: (payload) => {
+      const next = normalizeWaveform(payload)
+      waveform.value = next
+      latestTimestamp.value = next.timestamp
+      playbackState.value = next.type === 'FINAL' ? 'completed' : 'playing'
+    },
+    onError: () => {
+      playbackState.value = 'error'
+      appendLog('SSE 中断，准备重连')
+      closeWaveformStream()
+      reconnectTimer = window.setTimeout(connectWaveformStream, 1800)
+    }
+  })
+}
+
+const latestTimestampText = computed(() =>
+  latestTimestamp.value ? `最新帧: ${new Date(latestTimestamp.value).toLocaleString()}` : '等待波形数据'
+)
+
+onMounted(async () => {
+  connectWaveformStream()
+  await refreshParserStatus()
+  parserStatusTimer = setInterval(refreshParserStatus, 1500)
+})
+
+onUnmounted(() => {
+  closeWaveformStream()
+  if (parserStatusTimer) {
+    clearInterval(parserStatusTimer)
+  }
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer)
+  }
+})
 </script>
 
 <style scoped>
-.upload-test-container {
-  max-width: 1000px;
-  margin: 0 auto;
-  padding: 20px;
-  font-family: Arial, sans-serif;
-}
-
-h1 {
-  text-align: center;
-  color: #333;
-  margin-bottom: 30px;
-}
-
-h2 {
-  color: #555;
-  margin-top: 30px;
-  margin-bottom: 15px;
-}
-
-.file-selection {
-  background-color: #f5f5f5;
-  padding: 20px;
-  border-radius: 8px;
-  margin-bottom: 20px;
-}
-
-.file-info {
-  margin-top: 10px;
-  padding: 10px;
-  background-color: #e8f5e8;
-  border-radius: 4px;
-}
-
-.upload-controls {
-  margin-bottom: 20px;
-}
-
-.button-group {
+.upload-test-page {
+  min-height: 100vh;
+  padding: 16px;
   display: flex;
-  gap: 10px;
+  flex-direction: column;
+  gap: 16px;
+  background: linear-gradient(180deg, #f6f9fb 0%, #edf3f7 100%);
+}
+
+.panel {
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(208, 221, 229, 0.9);
+  border-radius: 16px;
+  padding: 14px;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.05);
+}
+
+.panel-header h1 {
+  margin: 0;
+  font-size: 1.3rem;
+  color: #132636;
+}
+
+.panel-header p {
+  margin: 6px 0 0;
+  color: #5a7180;
+  font-size: 0.88rem;
+}
+
+.grid {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px;
+}
+
+.field {
+  border: 1px solid rgba(212, 223, 230, 0.95);
+  border-radius: 12px;
+  background: #fcfefe;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.field span {
+  font-size: 0.78rem;
+  color: #526877;
+  font-weight: 700;
+}
+
+.field strong {
+  font-size: 0.9rem;
+  color: #193243;
+  word-break: break-all;
+}
+
+.file-summary {
+  margin-top: 10px;
+  display: flex;
   flex-wrap: wrap;
+  gap: 14px;
+  font-size: 0.85rem;
+  color: #395061;
+}
+
+.actions {
+  margin-top: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .btn {
-  padding: 10px 20px;
   border: none;
-  border-radius: 4px;
+  border-radius: 999px;
+  min-height: 36px;
+  padding: 0 16px;
+  font-weight: 700;
+  font-size: 0.84rem;
   cursor: pointer;
-  font-size: 14px;
-  font-weight: bold;
 }
 
 .btn:disabled {
-  opacity: 0.5;
+  opacity: 0.6;
   cursor: not-allowed;
 }
 
-.btn-primary {
-  background-color: #2196F3;
-  color: white;
+.btn.primary {
+  color: #f5fffd;
+  background: linear-gradient(135deg, #0f766e, #14b8a6);
 }
 
-.btn-success {
-  background-color: #4CAF50;
-  color: white;
+.btn.secondary {
+  color: #1f3a4b;
+  background: #d9e7ef;
 }
 
-.btn-info {
-  background-color: #00BCD4;
-  color: white;
+.btn.ghost {
+  color: #20384a;
+  background: #edf3f6;
 }
 
-.btn-warning {
-  background-color: #FF9800;
-  color: white;
+.progress-wrap {
+  margin-top: 12px;
 }
 
-.upload-progress {
-  background-color: #f5f5f5;
-  padding: 20px;
-  border-radius: 8px;
-  margin-bottom: 20px;
+.progress-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.82rem;
+  color: #3c5362;
+  margin-bottom: 8px;
 }
 
-.progress-bar {
-  width: 100%;
-  height: 20px;
-  background-color: #e0e0e0;
-  border-radius: 10px;
+.track {
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.2);
   overflow: hidden;
+}
+
+.fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #0f766e, #14b8a6);
+  transition: width 0.2s ease;
+}
+
+.parser-status {
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  font-size: 0.82rem;
+  color: #425b6b;
+}
+
+.chart-panel {
+  min-height: 420px;
+  display: flex;
+  flex-direction: column;
+}
+
+.chart-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
   margin-bottom: 10px;
 }
 
-.progress-fill {
-  height: 100%;
-  background-color: #4CAF50;
-  transition: width 0.3s ease;
+.chart-head h2 {
+  margin: 0;
+  font-size: 1.05rem;
 }
 
-.progress-text {
-  text-align: center;
-  font-weight: bold;
-  color: #333;
+.chart-head span {
+  font-size: 0.8rem;
+  color: #607887;
 }
 
-.realtime-data {
-  background-color: #f5f5f5;
-  padding: 20px;
-  border-radius: 8px;
-  margin-bottom: 20px;
-}
-
-.waveform-container {
-  text-align: center;
-  margin: 20px 0;
-}
-
-.data-status {
-  text-align: center;
-  color: #666;
-}
-
-.operation-log {
-  background-color: #f5f5f5;
-  padding: 20px;
-  border-radius: 8px;
-}
-
-.log-container {
-  max-height: 300px;
-  overflow-y: auto;
-  background-color: #2c3e50;
-  color: #ecf0f1;
-  padding: 10px;
-  border-radius: 4px;
+.logs {
+  margin-top: 8px;
+  max-height: 240px;
+  overflow: auto;
+  border: 1px solid rgba(210, 224, 230, 0.95);
+  border-radius: 12px;
+  background: #fbfeff;
 }
 
 .log-item {
-  margin-bottom: 5px;
-  padding: 5px;
-  border-bottom: 1px solid #34495e;
+  display: grid;
+  grid-template-columns: 88px 1fr;
+  gap: 10px;
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(232, 238, 242, 0.9);
+  font-size: 0.8rem;
 }
 
-.log-time {
-  color: #3498db;
-  margin-right: 10px;
-  font-size: 12px;
+.log-item:last-child {
+  border-bottom: none;
 }
 
-.log-message {
-  font-size: 14px;
+.time {
+  color: #5f7887;
 }
 
-@media (max-width: 768px) {
-  .button-group {
+.message {
+  color: #173142;
+  word-break: break-word;
+}
+
+.empty-log {
+  margin: 0;
+  padding: 18px 12px;
+  text-align: center;
+  color: #7790a1;
+  font-size: 0.82rem;
+}
+
+@media (max-width: 760px) {
+  .upload-test-page {
+    padding: 10px;
+  }
+
+  .actions {
     flex-direction: column;
   }
-  
+
   .btn {
     width: 100%;
   }
-  
-  .waveform-container canvas {
-    width: 100%;
-    height: auto;
+
+  .log-item {
+    grid-template-columns: 1fr;
+    gap: 4px;
   }
 }
 </style>

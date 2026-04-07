@@ -13,14 +13,26 @@
           </div>
 
           <div class="cabinet-list">
-            <el-button
+            <div
               v-for="cabinet in cabinets"
               :key="cabinet.id"
-              :type="selectedCabinet === cabinet.id ? 'primary' : 'default'"
-              @click="selectCabinet(cabinet.id)"
+              class="cabinet-action-item"
             >
-              {{ cabinet.name }}
-            </el-button>
+              <el-button
+                :type="selectedCabinet === cabinet.id ? 'primary' : 'default'"
+                @click="selectCabinet(cabinet.id)"
+              >
+                {{ cabinet.name }}
+              </el-button>
+              <el-button
+                type="success"
+                plain
+                :loading="!!negotiatingCabinets[cabinet.id]"
+                @click="initiateNegotiation(cabinet.id)"
+              >
+                发起密钥协商
+              </el-button>
+            </div>
           </div>
         </el-card>
 
@@ -114,7 +126,7 @@ import {
 import * as echarts from 'echarts';
 import { Check, Loading } from '@element-plus/icons-vue';
 import { ElMessage } from 'element-plus';
-import { get, getServerUrl } from '../axios/request';
+import { get, post, getServerUrl } from '../axios/request';
 
 /* ================= 基础数据 ================= */
 
@@ -128,6 +140,7 @@ const cabinets = ref(
 const selectedCabinet = ref('');
 const cabinetStates = reactive({});
 const selectedCabinetLogs = ref([]);
+const negotiatingCabinets = reactive({});
 
 /* ================= 工具：确保状态存在 ================= */
 const ensureState = (cabinetId) => {
@@ -266,7 +279,6 @@ const connectCabinetSSE = (cabinetId) => {
       const res = JSON.parse(e.data);
       if (res.code !== 0) return;
       const logItem = res.data;
-      if (logItem?.flag !== 1) return;
       selectedCabinetLogs.value = [logItem, ...selectedCabinetLogs.value]
         .sort((a, b) => Number(b.timestamp) - Number(a.timestamp))
         .slice(0, 10);
@@ -283,7 +295,7 @@ const connectCabinetSSE = (cabinetId) => {
 
 const fetchSelectedCabinetLogs = async (cabinetId) => {
   try {
-    const resp = await get('/api/key-negotiate/log', { cabinetId, flag: 1 });
+    const resp = await get('/api/key-negotiate/log', { cabinetId });
     if (resp?.data?.code !== 0 || !Array.isArray(resp?.data?.data)) {
       selectedCabinetLogs.value = [];
       return;
@@ -313,6 +325,26 @@ const selectCabinet = async (cabinetId) => {
   updateChart();
 
   connectCabinetSSE(cabinetId);
+};
+
+const initiateNegotiation = async (cabinetId) => {
+  if (!cabinetId || negotiatingCabinets[cabinetId]) return;
+
+  negotiatingCabinets[cabinetId] = true;
+  try {
+    const resp = await post('/api/key-negotiate/initiate', { cabinetId });
+    if (resp?.data?.code !== 0) {
+      ElMessage.error(resp?.data?.message || '发起密钥协商失败');
+      return;
+    }
+
+    ElMessage.success(`${getCabinetName(cabinetId)} 已发起密钥协商`);
+  } catch (err) {
+    console.error('initiate negotiation failed', err);
+    ElMessage.error('发起密钥协商失败');
+  } finally {
+    negotiatingCabinets[cabinetId] = false;
+  }
 };
 
 /* ================= 生命周期 ================= */
@@ -414,7 +446,13 @@ const formatTimestamp = (timestamp) => {
   padding: 20px;
 }
 
-.cabinet-list .el-button {
+.cabinet-action-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cabinet-action-item .el-button {
   width: 100%;
   margin-left: 0;
   margin-right: 0;
@@ -424,7 +462,7 @@ const formatTimestamp = (timestamp) => {
   justify-content: center;
 }
 
-.cabinet-list .el-button + .el-button {
+.cabinet-action-item .el-button + .el-button {
   margin-left: 0;
 }
 
