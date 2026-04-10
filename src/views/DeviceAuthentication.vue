@@ -174,6 +174,16 @@ const currentStatusText = computed(() => getStatusTextByValue(currentStatus.valu
 
 let eventSource = null;
 
+const closeEventSource = () => {
+  if (!eventSource) return;
+  // Avoid stale callbacks from a closed source touching the new active source.
+  eventSource.onopen = null;
+  eventSource.onerror = null;
+  eventSource.onmessage = null;
+  eventSource.close();
+  eventSource = null;
+};
+
 const getCabinetName = (cabinetId) => {
   return cabinets.value.find((c) => c.id === cabinetId)?.name || cabinetId;
 };
@@ -181,18 +191,16 @@ const getCabinetName = (cabinetId) => {
 const connectCabinetSSE = (cabinetId) => {
   if (!cabinetId) return;
 
-  if (eventSource) {
-    eventSource.close();
-    eventSource = null;
-  }
+  closeEventSource();
 
   const state = ensureState(cabinetId);
   const serverBase = getServerUrl().replace(/\/$/, '');
-  eventSource = new EventSource(
+  const source = new EventSource(
     `${serverBase}/api/device-auth/sse?cabinetId=${encodeURIComponent(cabinetId)}`
   );
+  eventSource = source;
 
-  eventSource.addEventListener('status', (e) => {
+  source.addEventListener('status', (e) => {
     try {
       const res = JSON.parse(e.data);
       if (res.code !== 0) return;
@@ -208,7 +216,7 @@ const connectCabinetSSE = (cabinetId) => {
     }
   });
 
-  eventSource.addEventListener('log', (e) => {
+  source.addEventListener('log', (e) => {
     try {
       const res = JSON.parse(e.data);
       if (res.code !== 0) return;
@@ -221,9 +229,13 @@ const connectCabinetSSE = (cabinetId) => {
     }
   });
 
-  eventSource.onerror = () => {
-    eventSource?.close();
-    eventSource = null;
+  source.onerror = () => {
+    // Firefox may fire error while closing an old source; guard active instance.
+    if (eventSource !== source) {
+      source.close();
+      return;
+    }
+    closeEventSource();
   };
 };
 
@@ -274,8 +286,7 @@ const initiateAuthentication = async (cabinetId) => {
 };
 
 onUnmounted(() => {
-  eventSource?.close();
-  eventSource = null;
+  closeEventSource();
 });
 
 const getStatusType = () => getStatusTypeByValue(currentStatus.value);
