@@ -141,6 +141,7 @@ const selectedCabinet = ref('');
 const cabinetStates = reactive({});
 const selectedCabinetLogs = ref([]);
 const negotiatingCabinets = reactive({});
+const LAST_SELECTED_CABINET_KEY = 'key-negotiation:selected-cabinet';
 
 /* ================= 工具：确保状态存在 ================= */
 const ensureState = (cabinetId) => {
@@ -322,14 +323,45 @@ const fetchSelectedCabinetLogs = async (cabinetId) => {
   }
 };
 
+const fetchCabinetState = async (cabinetId) => {
+  const state = ensureState(cabinetId);
+  try {
+    const resp = await get('/api/key-negotiate/state', { cabinetId });
+    const payload = resp?.data;
+    if (payload?.code !== 0 || !payload?.data) {
+      state.status = -1;
+      state.rssiData = [];
+      return;
+    }
+
+    const backendState = payload.data;
+    const rawStatus = Number(backendState.negotiate_status);
+    state.status = Number.isFinite(rawStatus) ? rawStatus : -1;
+
+    const rawRssi = Array.isArray(backendState.rssiData) ? backendState.rssiData : [];
+    state.rssiData = rawRssi
+      .map((item) => Number(item))
+      .filter((item) => Number.isFinite(item))
+      .slice(-50);
+  } catch (err) {
+    state.status = -1;
+    state.rssiData = [];
+    console.error('fetch cabinet negotiation state failed', err);
+  }
+};
+
 /* ================= 交互 ================= */
 
 const selectCabinet = async (cabinetId) => {
   if (selectedCabinet.value === cabinetId) return;
 
   selectedCabinet.value = cabinetId;
+  localStorage.setItem(LAST_SELECTED_CABINET_KEY, cabinetId);
   ensureState(cabinetId);
-  await fetchSelectedCabinetLogs(cabinetId);
+  await Promise.all([
+    fetchCabinetState(cabinetId),
+    fetchSelectedCabinetLogs(cabinetId)
+  ]);
 
   await nextTick();
 
@@ -363,8 +395,17 @@ const initiateNegotiation = async (cabinetId) => {
 
 const handleResize = () => chart?.resize();
 
-onMounted(() => {
+const restoreLastSelectedCabinet = async () => {
+  const lastSelected = localStorage.getItem(LAST_SELECTED_CABINET_KEY);
+  if (!lastSelected) return;
+  const exists = cabinets.value.some((cabinet) => cabinet.id === lastSelected);
+  if (!exists) return;
+  await selectCabinet(lastSelected);
+};
+
+onMounted(async () => {
   window.addEventListener('resize', handleResize);
+  await restoreLastSelectedCabinet();
 });
 
 onUnmounted(() => {

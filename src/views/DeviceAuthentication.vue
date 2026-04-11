@@ -104,7 +104,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onUnmounted } from 'vue';
+import { ref, reactive, computed, onMounted, onUnmounted } from 'vue';
 import { Check, Loading } from '@element-plus/icons-vue';
 import { ElMessage } from 'element-plus';
 import { get, post, getServerUrl } from '../axios/request';
@@ -137,6 +137,7 @@ const selectedCabinet = ref('');
 const cabinetStates = reactive({});
 const selectedCabinetLogs = ref([]);
 const authenticatingCabinets = reactive({});
+const LAST_SELECTED_CABINET_KEY = 'device-authentication:selected-cabinet';
 
 const ensureState = (cabinetId) => {
   if (!cabinetStates[cabinetId]) {
@@ -256,12 +257,33 @@ const fetchSelectedCabinetLogs = async (cabinetId) => {
   }
 };
 
+const fetchCabinetState = async (cabinetId) => {
+  const state = ensureState(cabinetId);
+  try {
+    const resp = await get('/api/device-auth/state', { cabinetId });
+    const payload = resp?.data;
+    if (payload?.code !== 0 || !payload?.data) {
+      state.status = -1;
+      return;
+    }
+    const rawStatus = Number(payload.data.auth_status);
+    state.status = Number.isFinite(rawStatus) ? rawStatus : -1;
+  } catch (err) {
+    state.status = -1;
+    console.error('fetch cabinet authentication state failed', err);
+  }
+};
+
 const selectCabinet = async (cabinetId) => {
   if (selectedCabinet.value === cabinetId) return;
 
   selectedCabinet.value = cabinetId;
+  localStorage.setItem(LAST_SELECTED_CABINET_KEY, cabinetId);
   ensureState(cabinetId);
-  await fetchSelectedCabinetLogs(cabinetId);
+  await Promise.all([
+    fetchCabinetState(cabinetId),
+    fetchSelectedCabinetLogs(cabinetId)
+  ]);
   connectCabinetSSE(cabinetId);
 };
 
@@ -284,6 +306,18 @@ const initiateAuthentication = async (cabinetId) => {
     authenticatingCabinets[cabinetId] = false;
   }
 };
+
+const restoreLastSelectedCabinet = async () => {
+  const lastSelected = localStorage.getItem(LAST_SELECTED_CABINET_KEY);
+  if (!lastSelected) return;
+  const exists = cabinets.value.some((cabinet) => cabinet.id === lastSelected);
+  if (!exists) return;
+  await selectCabinet(lastSelected);
+};
+
+onMounted(async () => {
+  await restoreLastSelectedCabinet();
+});
 
 onUnmounted(() => {
   closeEventSource();
