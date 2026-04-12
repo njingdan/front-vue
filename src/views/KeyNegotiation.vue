@@ -95,7 +95,7 @@
           <div v-else class="cabinet-log-list">
             <div
               v-for="log in selectedCabinetLogs"
-              :key="`${log.timestamp}-${log.step}-${log.info}`"
+              :key="`${log.timestamp}-${log.flag ?? 1}-${log.step}-${log.info}`"
               class="cabinet-log-item"
             >
               <div class="cabinet-log-time">{{ formatTimestamp(log.timestamp) }}</div>
@@ -353,8 +353,6 @@ const fetchCabinetState = async (cabinetId) => {
 /* ================= 交互 ================= */
 
 const selectCabinet = async (cabinetId) => {
-  if (selectedCabinet.value === cabinetId) return;
-
   selectedCabinet.value = cabinetId;
   localStorage.setItem(LAST_SELECTED_CABINET_KEY, cabinetId);
   ensureState(cabinetId);
