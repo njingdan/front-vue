@@ -110,20 +110,20 @@ import { ElMessage } from 'element-plus';
 import { get, post, getServerUrl } from '../axios/request';
 
 const texts = {
-  pageTitle: '\u50a8\u80fd\u67dc\u8bbe\u5907\u8ba4\u8bc1',
-  cabinetList: '\u50a8\u80fd\u67dc\u5217\u8868',
-  initiateAuth: '\u53d1\u8d77\u8bbe\u5907\u8ba4\u8bc1',
-  processTitleSuffix: '\u8bbe\u5907\u8ba4\u8bc1\u6d41\u7a0b',
-  selectProcessEmpty: '\u8bf7\u9009\u62e9\u4e00\u4e2a\u50a8\u80fd\u67dc\u67e5\u770b\u8bbe\u5907\u8ba4\u8bc1\u6d41\u7a0b',
-  logsTitle: '\u50a8\u80fd\u67dc\u65e5\u5fd7',
-  latestLogsSuffix: '\u6700\u8fd110\u6761\u65e5\u5fd7',
-  noLogs: '\u6682\u65e0\u65e5\u5fd7\u6570\u636e',
-  selectLogsEmpty: '\u8bf7\u9009\u62e9\u5de6\u4fa7\u50a8\u80fd\u67dc\u67e5\u770b\u65e5\u5fd7',
-  authCompleted: '\u8bbe\u5907\u8ba4\u8bc1\u5b8c\u6210',
-  initiated: '\u5df2\u53d1\u8d77\u8bbe\u5907\u8ba4\u8bc1',
-  initiateFailed: '\u53d1\u8d77\u8bbe\u5907\u8ba4\u8bc1\u5931\u8d25',
-  notStarted: '\u672a\u5f00\u59cb',
-  completed: '\u5b8c\u6210'
+  pageTitle: '储能柜设备认证',
+  cabinetList: '储能柜列表',
+  initiateAuth: '发起设备认证',
+  processTitleSuffix: '设备认证流程',
+  selectProcessEmpty: '请选择一个储能柜查看设备认证流程',
+  logsTitle: '储能柜日志',
+  latestLogsSuffix: '最近500条日志',
+  noLogs: '暂无日志数据',
+  selectLogsEmpty: '请选择左侧储能柜查看日志',
+  authCompleted: '设备认证完成',
+  initiated: '已发起设备认证',
+  initiateFailed: '发起设备认证失败',
+  notStarted: '未开始',
+  completed: '完成'
 };
 
 const cabinets = ref(
@@ -138,6 +138,7 @@ const cabinetStates = reactive({});
 const selectedCabinetLogs = ref([]);
 const authenticatingCabinets = reactive({});
 const LAST_SELECTED_CABINET_KEY = 'device-authentication:selected-cabinet';
+const MAX_VISIBLE_LOGS = 10;
 
 const ensureState = (cabinetId) => {
   if (!cabinetStates[cabinetId]) {
@@ -222,9 +223,9 @@ const connectCabinetSSE = (cabinetId) => {
       const res = JSON.parse(e.data);
       if (res.code !== 0) return;
       const logItem = res.data;
-      selectedCabinetLogs.value = [logItem, ...selectedCabinetLogs.value]
-        .sort((a, b) => Number(b.timestamp) - Number(a.timestamp))
-        .slice(0, 10);
+      selectedCabinetLogs.value = [...selectedCabinetLogs.value, logItem]
+        .sort((a, b) => Number(a.timestamp) - Number(b.timestamp))
+        .slice(-MAX_VISIBLE_LOGS);
     } catch (err) {
       console.error('LOG parse failed', err);
     }
@@ -249,8 +250,8 @@ const fetchSelectedCabinetLogs = async (cabinetId) => {
     }
     selectedCabinetLogs.value = resp.data.data
       .slice()
-      .sort((a, b) => Number(b.timestamp) - Number(a.timestamp))
-      .slice(0, 10);
+      .sort((a, b) => Number(a.timestamp) - Number(b.timestamp))
+      .slice(-MAX_VISIBLE_LOGS);
   } catch (err) {
     selectedCabinetLogs.value = [];
     console.error('fetch selected logs failed', err);

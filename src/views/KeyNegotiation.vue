@@ -88,7 +88,7 @@
         </div>
 
         <div v-if="selectedCabinet" class="cabinet-sidebar-list">
-          <div class="selected-cabinet-title">{{ selectedCabinetName }} 最近10条日志</div>
+          <div class="selected-cabinet-title">{{ selectedCabinetName }} 最近500条日志</div>
 
           <el-empty v-if="selectedCabinetLogs.length === 0" description="暂无日志数据" />
 
@@ -142,6 +142,7 @@ const cabinetStates = reactive({});
 const selectedCabinetLogs = ref([]);
 const negotiatingCabinets = reactive({});
 const LAST_SELECTED_CABINET_KEY = 'key-negotiation:selected-cabinet';
+const MAX_VISIBLE_LOGS = 10;
 
 /* ================= 工具：确保状态存在 ================= */
 const ensureState = (cabinetId) => {
@@ -288,9 +289,9 @@ const connectCabinetSSE = (cabinetId) => {
       const res = JSON.parse(e.data);
       if (res.code !== 0) return;
       const logItem = res.data;
-      selectedCabinetLogs.value = [logItem, ...selectedCabinetLogs.value]
-        .sort((a, b) => Number(b.timestamp) - Number(a.timestamp))
-        .slice(0, 10);
+      selectedCabinetLogs.value = [...selectedCabinetLogs.value, logItem]
+        .sort((a, b) => Number(a.timestamp) - Number(b.timestamp))
+        .slice(-MAX_VISIBLE_LOGS);
     } catch (err) {
       console.error('LOG parse failed', err);
     }
@@ -315,8 +316,8 @@ const fetchSelectedCabinetLogs = async (cabinetId) => {
     }
     selectedCabinetLogs.value = resp.data.data
       .slice()
-      .sort((a, b) => Number(b.timestamp) - Number(a.timestamp))
-      .slice(0, 10);
+      .sort((a, b) => Number(a.timestamp) - Number(b.timestamp))
+      .slice(-MAX_VISIBLE_LOGS);
   } catch (err) {
     selectedCabinetLogs.value = [];
     console.error('fetch selected logs failed', err);

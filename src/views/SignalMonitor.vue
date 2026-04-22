@@ -4,7 +4,7 @@
       <div class="toolbar-main">
         <div>
           <p class="eyebrow">Signal Monitor</p>
-          <h1>Live Waveform Rendering</h1>
+          <p style="font-size: 0.875rem;">Live Waveform Rendering</p>
         </div>
 
         <div class="toolbar-status">
@@ -301,7 +301,7 @@ h1 {
 
 .toolbar-meta {
   color: #5b7080;
-  font-size: 0.82rem;
+  font-size: 0.8rem;
   text-align: right;
 }
 
